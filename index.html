@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Address Mapper</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_API_KEY&callback=initMap" async defer></script>
+    <script>
+        let map;
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 40.8448, lng: -73.8648 }, // Centered in the Bronx
+                zoom: 12,
+            });
+        }
+        
+        function geocodeAddresses() {
+            const addresses = document.getElementById("addressInput").value.split("\n");
+            const geocoder = new google.maps.Geocoder();
+            addresses.forEach((address, index) => {
+                geocoder.geocode({ address: address.trim() }, (results, status) => {
+                    if (status === "OK" && results[0]) {
+                        new google.maps.Marker({
+                            position: results[0].geometry.location,
+                            map: map,
+                            title: address.trim()
+                        });
+                    } else {
+                        console.error("Geocode failed for: ", address, " - Status: ", status);
+                    }
+                });
+            });
+        }
+    </script>
+</head>
+<body onload="initMap()">
+    <h2>Paste Addresses Below:</h2>
+    <textarea id="addressInput" rows="10" cols="50"></textarea>
+    <br>
+    <button onclick="geocodeAddresses()">Plot Addresses</button>
+    <div id="map" style="height: 500px; width: 100%; margin-top: 20px;"></div>
+</body>
+</html>
