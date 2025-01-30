@@ -1,43 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Address Mapper</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_API_KEY&callback=initMap" async defer></script>
+    <style>
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        max-width: 100%;
+        resize: none;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+      h3 {
+        margin-bottom: 0;
+      }
+      #map {
+        height: 500px;
+        width: 100%;
+        margin-top: 20px;
+        display: none; /* Hide the map initially */
+      }
+    </style>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_API_KEY&callback=initMap"
+      async
+      defer
+    ></script>
     <script>
-        let map;
-        function initMap() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                center: { lat: 40.8448, lng: -73.8648 }, // Centered in the Bronx
-                zoom: 12,
-            });
-        }
-        
-        function geocodeAddresses() {
-            const addresses = document.getElementById("addressInput").value.split("\n");
-            const geocoder = new google.maps.Geocoder();
-            addresses.forEach((address, index) => {
-                geocoder.geocode({ address: address.trim() }, (results, status) => {
-                    if (status === "OK" && results[0]) {
-                        new google.maps.Marker({
-                            position: results[0].geometry.location,
-                            map: map,
-                            title: address.trim()
-                        });
-                    } else {
-                        console.error("Geocode failed for: ", address, " - Status: ", status);
-                    }
-                });
-            });
-        }
+      let map;
+      let activeInfoWindow = null;
+
+      function initMap() {
+        // Define a style to hide POIs
+        const mapStyle = [
+          {
+            featureType: "poi", // Targets points of interest
+            elementType: "labels", // Hides labels for POIs
+            stylers: [{ visibility: "off" }], // Turns off visibility <button class="citation-flag" data-index="4">
+          },
+          {
+            featureType: "poi",
+            elementType: "geometry", // Hides the icons for POIs
+            stylers: [{ visibility: "off" }],
+          },
+        ];
+
+        // Initialize the map with the custom style
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: 40.8448, lng: -73.8648 }, // Default center (Bronx)
+          zoom: 12,
+          styles: mapStyle, // Apply the custom style to hide POIs
+        });
+      }
+
+      function geocodeAddresses() {
+        const addresses = document
+          .getElementById("addressInput")
+          .value.split("\n");
+        const geocoder = new google.maps.Geocoder();
+
+        // Show the map when the button is clicked
+        document.getElementById("map").style.display = "block";
+
+        addresses.forEach((address, index) => {
+          geocoder.geocode({ address: address.trim() }, (results, status) => {
+            if (status === "OK" && results[0]) {
+              // Extract the street address from the geocoder result
+              let streetAddress = "";
+              if (results[0].address_components) {
+                const addressComponents = results[0].address_components;
+                const streetNumber = addressComponents.find((component) =>
+                  component.types.includes("street_number")
+                );
+                const route = addressComponents.find((component) =>
+                  component.types.includes("route")
+                );
+                streetAddress = `${streetNumber?.long_name || ""} ${
+                  route?.long_name || ""
+                }`.trim();
+              }
+
+              const marker = new google.maps.Marker({
+                position: results[0].geometry.location,
+                map: map,
+                title: streetAddress,
+              });
+
+              // Center the map on the first address
+              if (index === 0) {
+                map.setCenter(results[0].geometry.location); // Center the map <button class="citation-flag" data-index="4">
+              }
+
+              // Create an InfoWindow for each marker
+              const infoWindow = new google.maps.InfoWindow({
+                content: `<strong>${streetAddress}</strong><br>${results[0].formatted_address}`,
+              });
+
+              // Add a click listener to open the InfoWindow when the marker is clicked
+              marker.addListener("click", () => {
+                if (activeInfoWindow) {
+                  activeInfoWindow.close(); // Close the previously open InfoWindow
+                }
+                infoWindow.open(map, marker); // Open the new InfoWindow
+                activeInfoWindow = infoWindow; // Update the reference to the currently open InfoWindow
+              });
+            } else {
+              console.error(
+                "Geocode failed for: ",
+                address,
+                " - Status: ",
+                status
+              );
+            }
+          });
+        });
+      }
     </script>
-</head>
-<body onload="initMap()">
-    <h2>Paste Addresses Below:</h2>
+  </head>
+  <body onload="initMap()">
+    <h3>Paste Addresses Below:</h3>
+    <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
     <textarea id="addressInput" rows="10" cols="50"></textarea>
-    <br>
+    <br />
     <button onclick="geocodeAddresses()">Plot Addresses</button>
-    <div id="map" style="height: 500px; width: 100%; margin-top: 20px;"></div>
-</body>
+    <div id="map"></div>
+  </body>
 </html>
