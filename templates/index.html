@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Address Mapper</title>
+    <style>
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        max-width: 100%;
+        resize: none;
+      }
+      button {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        box-sizing: border-box;
+      }
+      h3 {
+        margin-bottom: 0;
+      }
+      #map {
+        height: 500px;
+        width: 100%;
+        margin-top: 20px;
+        display: none; /* Hide the map initially */
+      }
+      /* Styles for the loading spinner */
+      .spinner-container {
+        z-index: 1000; /* Ensure it appears on top */
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+        justify-content: center;
+        align-items: center;
+      }
+      .spinner {
+        border: 8px solid #f3f3f3; /* Light gray background */
+        border-top: 8px solid #3498db; /* Blue "spinning" part */
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite; /* Spin animation */
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Paste Blob Below:</h3>
+    <textarea id="blobInput" rows="10" cols="50"></textarea>
+    <br />
+    <button onclick="extractAddresses()">Convert Blob to Addresses</button>
+
+    <!-- Loading spinner container -->
+    <div id="spinnerContainer" class="spinner-container">
+      <div class="spinner"></div>
+    </div>
+
+    <h3>Paste Addresses Below:</h3>
+    <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
+    <textarea id="addressInput" rows="10" cols="50"></textarea>
+    <br />
+    <button onclick="geocodeAddresses()">Plot Addresses</button>
+
+    <div id="map"></div>
+
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"
+      async
+      defer
+    ></script>
+    <script>
+      let map;
+      let activeInfoWindow = null;
+
+      function initMap() {
+        // Initialize the map without geocoding logic
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: 40.8448, lng: -73.8648 }, // Default center (Bronx)
+          zoom: 12,
+        });
+      }
+
+      async function extractAddresses() {
+        const text = document.getElementById("blobInput").value;
+        const spinnerContainer = document.getElementById("spinnerContainer");
+        spinnerContainer.style.display = "flex"; // Display the spinner
+
+        try {
+          const response = await fetch("/extract-addresses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to extract addresses");
+          }
+
+          const data = await response.json();
+          document.getElementById("addressInput").value = data.addresses;
+        } catch (error) {
+          console.error("Failed to extract addresses:", error);
+          alert(`Error: ${error.message}`);
+        } finally {
+          spinnerContainer.style.display = "none";
+        }
+      }
+
+      async function geocodeAddresses() {
+        const addresses = document
+          .getElementById("addressInput")
+          .value.split("\n");
+        const spinnerContainer = document.getElementById("spinnerContainer");
+        spinnerContainer.style.display = "flex"; // Display the spinner
+
+        try {
+          const response = await fetch("/geocode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ addresses }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to geocode addresses");
+          }
+
+          const data = await response.json();
+          const results = data.results;
+
+          // Clear existing markers
+          if (map) {
+            map.setCenter({ lat: 40.8448, lng: -73.8648 }); // Reset map center
+          }
+
+          results.forEach((result, index) => {
+            if (result.error) {
+              console.error(`Geocoding failed for: ${result.address}`);
+              return;
+            }
+
+            const marker = new google.maps.Marker({
+              position: { lat: result.latitude, lng: result.longitude },
+              map: map,
+              title: result.street_address,
+            });
+
+            // Center the map on the first address
+            if (index === 0) {
+              map.setCenter({ lat: result.latitude, lng: result.longitude });
+            }
+
+            const infoWindow = new google.maps.InfoWindow({
+              content: `<strong>${result.street_address}</strong><br>${result.address}`,
+            });
+
+            marker.addListener("click", () => {
+              if (activeInfoWindow) {
+                activeInfoWindow.close();
+              }
+              infoWindow.open(map, marker);
+              activeInfoWindow = infoWindow;
+            });
+          });
+
+          document.getElementById("map").style.display = "block"; // Show the map
+        } catch (error) {
+          console.error("Failed to geocode addresses:", error);
+          alert(`Error: ${error.message}`);
+        } finally {
+          spinnerContainer.style.display = "none";
+        }
+      }
+    </script>
+  </body>
+</html>
