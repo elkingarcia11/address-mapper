@@ -10,12 +10,19 @@
 body {
   background-color: var(--background-color);
   width: 100%; /* Full-width button */
+  overflow-x: hidden; /* Prevent scrolling */
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Full viewport height */
 }
 
 textarea {
   width: calc(100% - 32px); /* Subtract left and right margins */
   padding: 16px;
-  margin: 8px 0 8px 0;
+  margin: 8px 16px 8px 16px;
   font-size: 16px; /* Font size */
   box-sizing: border-box;
   max-width: 100%;
@@ -27,6 +34,9 @@ button {
   width: calc(100% - 32px); /* Subtract left and right margins */
   padding: 12px; /* Slightly increased padding for better spacing */
   font-size: 16px; /* Font size */
+  margin: 0px 16px 0px 16px;
+  display: flex;
+  justify-content: center;
   box-sizing: border-box; /* Ensures padding doesn't affect width */
   background-color: var(--primary-color); /* Primary color as background */
   color: var(--button-text-color); /* Text color (e.g., white) */
@@ -37,7 +47,9 @@ button {
   transition: all 0.3s ease; /* Smooth transition for hover effects */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
-
+p {
+  margin-left: 24px;
+}
 /* Hover effect */
 button:hover {
   background-color: var(--button-hover-color); /* Darker shade on hover */
@@ -58,7 +70,6 @@ button span {
 
 #blobHeader,
 #addressHeader {
-  display: flex;
   justify-content: space-between;
   background-color: white;
   color: var(--secondary-color);
@@ -73,20 +84,13 @@ button span {
   margin-bottom: 16px;
 }
 
-#blobSection,
-#addressSection {
-  display: none; /* Hidden by default */
-}
-
-h3 {
-  cursor: pointer; /* Change cursor to indicate it's clickable */
-  color: var(--primary-color); /* Optional: Style the headers */
-  font-weight: bold;
+.hidden {
+  display: none;
 }
 
 #map {
-  height: 500px;
-  width: 100%;
+  flex-grow: 1; /* Take up remaining space */
+  width: 100%; /* Full width */
   margin-top: 20px;
   display: none; /* Hide the map initially */
 }

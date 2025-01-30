@@ -19,45 +19,48 @@
     />
   </head>
   <body>
-    <!-- Blob Section -->
-    <button
-      id="blobHeader"
-      onclick="toggleSection('blobSection')"
-      role="button"
-    >
-      Convert Blob to Addresses:
-      <span id="blobIndicator" class="chevron">▼</span>
-    </button>
-    <div id="blobSection">
-      <textarea id="blobInput" rows="10" cols="50"></textarea>
-      <br />
-      <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
+    <div class="container">
+      <!-- Blob Section -->
+      <button
+        id="blobHeader"
+        onclick="toggleSection('blobSection')"
+        role="button"
+      >
+        Convert Blob to Addresses:
+        <span id="blobSectionIndicator" class="chevron">▼</span>
+      </button>
+      <section id="blobSection" class="hidden">
+        <textarea id="blobInput" rows="10" cols="50"></textarea>
+        <br />
+        <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
+
+        <!-- Loading spinner container -->
+        <div id="spinnerContainer" class="spinner-container">
+          <div class="spinner"></div>
+        </div>
+      </section>
+
       <!-- Loading spinner container -->
       <div id="spinnerContainer" class="spinner-container">
         <div class="spinner"></div>
       </div>
+
+      <!-- Address Section -->
+      <button id="addressHeader" onclick="toggleSection('addressSection')">
+        Plot Addresses on Map:
+        <span id="addressSectionIndicator" class="chevron">▼</span>
+      </button>
+
+      <section id="addressSection" class="hidden">
+        <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
+        <textarea id="addressInput" rows="10" cols="50"></textarea>
+        <br />
+        <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
+      </section>
+
+      <!-- Map Section -->
+      <div id="map"></div>
     </div>
-    <!-- Loading spinner container -->
-    <div id="spinnerContainer" class="spinner-container">
-      <div class="spinner"></div>
-    </div>
-
-    <!-- Address Section -->
-    <button id="addressHeader" onclick="toggleSection('addressSection')">
-      Plot Addresses on Map:
-      <span id="addressIndicator" class="chevron">▼</span>
-    </button>
-
-    <div id="addressSection">
-      <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
-      <textarea id="addressInput" rows="10" cols="50"></textarea>
-      <br />
-      <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
-    </div>
-
-    <!-- Map Section -->
-    <div id="map" style="height: 500px; width: 100%; display: none"></div>
-
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script
       src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"

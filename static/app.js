@@ -120,11 +120,13 @@ function toggleSection(sectionId) {
   const section = document.getElementById(sectionId);
   const indicator = document.getElementById(`${sectionId}Indicator`);
 
-  if (section.style.display === "none" || section.style.display === "") {
-    section.style.display = "block"; // Show the section
-    indicator.textContent = "▲"; // Change chevron to up
+  // Toggle the 'hidden' class on the section
+  section.classList.toggle("hidden");
+
+  // Update the indicator text based on the visibility state
+  if (section.classList.contains("hidden")) {
+    indicator.textContent = "▼"; // Chevron down when hidden
   } else {
-    section.style.display = "none"; // Hide the section
-    indicator.textContent = "▼"; // Change chevron to down
+    indicator.textContent = "▲"; // Chevron up when visible
   }
 }
