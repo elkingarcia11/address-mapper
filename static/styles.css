@@ -9,11 +9,13 @@
 
 body {
   background-color: var(--background-color);
+  width: 100%; /* Full-width button */
 }
 
 textarea {
-  padding: 16px;
-  width: 100%;
+  width: calc(100% - 32px); /* Subtract left and right margins */
+  margin: 8px 0 8px 0;
+  font-size: 16px; /* Font size */
   box-sizing: border-box;
   max-width: 100%;
   resize: none;
@@ -21,7 +23,7 @@ textarea {
 }
 
 button {
-  width: 100%; /* Full-width button */
+  width: calc(100% - 32px); /* Subtract left and right margins */
   padding: 12px; /* Slightly increased padding for better spacing */
   font-size: 16px; /* Font size */
   box-sizing: border-box; /* Ensures padding doesn't affect width */
@@ -46,6 +48,39 @@ button:hover {
 button:active {
   transform: translateY(0); /* Reset position */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Return to normal shadow */
+}
+
+button span {
+  font-size: 18px; /* Slightly larger chevron */
+  transition: transform 0.3s ease; /* Smooth rotation effect */
+}
+
+#blobHeader,
+#addressHeader {
+  display: flex;
+  justify-content: space-between;
+  background-color: white;
+  color: var(--secondary-color);
+  margin-top: 16px;
+}
+#addressInput {
+  margin-top: 0;
+}
+
+#blobSubmit,
+#addressSubmit {
+  margin-bottom: 16px;
+}
+
+#blobSection,
+#addressSection {
+  display: none; /* Hidden by default */
+}
+
+h3 {
+  cursor: pointer; /* Change cursor to indicate it's clickable */
+  color: var(--primary-color); /* Optional: Style the headers */
+  font-weight: bold;
 }
 
 #map {

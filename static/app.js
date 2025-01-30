@@ -2,10 +2,28 @@ let map;
 let activeInfoWindow = null;
 
 function initMap() {
+  // Define a style to hide Points of Interest (POIs)
+  const mapStyle = [
+    {
+      featureType: "poi", // Targets Points of Interest
+      elementType: "labels", // Targets labels/icons of POIs
+      stylers: [{ visibility: "off" }], // Hides them
+    },
+    {
+      featureType: "poi",
+      elementType: "geometry", // Targets the geometry (shapes) of POIs
+      stylers: [{ visibility: "off" }], // Hides them
+    },
+  ];
   // Initialize the map without geocoding logic
   map = new google.maps.Map(document.getElementById("map"), {
     center: { lat: 40.8448, lng: -73.8648 }, // Default center (Bronx)
     zoom: 12,
+    styles: mapStyle, // Apply the custom styles
+    mapTypeControl: false, // Disable map type controls (Map/Satellite/Terrain)
+    streetViewControl: false, // Disable Street View control (pegman icon),
+    rotateControl: false, // Optional: Disable rotate control
+    gestureHandling: "cooperative", // Improve touch gestures on mobile
   });
 
   // Listen for the 'idle' event to ensure the map is fully loaded
@@ -95,5 +113,18 @@ async function geocodeAddresses() {
     alert(`Error: ${error.message}`);
   } finally {
     spinnerContainer.style.display = "none";
+  }
+}
+
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  const indicator = document.getElementById(`${sectionId}Indicator`);
+
+  if (section.style.display === "none" || section.style.display === "") {
+    section.style.display = "block"; // Show the section
+    indicator.textContent = "▲"; // Change chevron to up
+  } else {
+    section.style.display = "none"; // Hide the section
+    indicator.textContent = "▼"; // Change chevron to down
   }
 }

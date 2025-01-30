@@ -13,24 +13,49 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='styles.css') }}"
     />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
   </head>
   <body>
-    <h3>Paste Blob Below:</h3>
-    <textarea id="blobInput" rows="10" cols="50"></textarea>
-    <br />
-    <button onclick="extractAddresses()">Convert Blob to Addresses</button>
-
+    <!-- Blob Section -->
+    <button
+      id="blobHeader"
+      onclick="toggleSection('blobSection')"
+      role="button"
+    >
+      Convert Blob to Addresses:
+      <span id="blobIndicator" class="chevron">▼</span>
+    </button>
+    <div id="blobSection">
+      <textarea id="blobInput" rows="10" cols="50"></textarea>
+      <br />
+      <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
+      <!-- Loading spinner container -->
+      <div id="spinnerContainer" class="spinner-container">
+        <div class="spinner"></div>
+      </div>
+    </div>
     <!-- Loading spinner container -->
     <div id="spinnerContainer" class="spinner-container">
       <div class="spinner"></div>
     </div>
 
-    <h3>Paste Addresses Below:</h3>
-    <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
-    <textarea id="addressInput" rows="10" cols="50"></textarea>
-    <br />
-    <button onclick="geocodeAddresses()">Plot Addresses</button>
+    <!-- Address Section -->
+    <button id="addressHeader" onclick="toggleSection('addressSection')">
+      Plot Addresses on Map:
+      <span id="addressIndicator" class="chevron">▼</span>
+    </button>
 
+    <div id="addressSection">
+      <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
+      <textarea id="addressInput" rows="10" cols="50"></textarea>
+      <br />
+      <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
+    </div>
+
+    <!-- Map Section -->
     <div id="map" style="height: 500px; width: 100%; display: none"></div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
