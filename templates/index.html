@@ -26,13 +26,13 @@
     <br />
     <button onclick="geocodeAddresses()">Plot Addresses</button>
 
-    <div id="map"></div>
+    <div id="map" style="height: 500px; width: 100%; display: none"></div>
 
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script
       src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"
       async
       defer
     ></script>
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>

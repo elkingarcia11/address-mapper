@@ -7,6 +7,11 @@ function initMap() {
     center: { lat: 40.8448, lng: -73.8648 }, // Default center (Bronx)
     zoom: 12,
   });
+
+  // Listen for the 'idle' event to ensure the map is fully loaded
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    console.log("Map is ready!");
+  });
 }
 
 async function extractAddresses() {
@@ -49,6 +54,12 @@ async function geocodeAddresses() {
     }
     const data = await response.json();
     const results = data.results;
+
+    if (!map) {
+      console.error("Map is not initialized yet.");
+      return;
+    }
+
     // Clear existing markers
     if (map) {
       map.setCenter({ lat: 40.8448, lng: -73.8648 }); // Reset map center
