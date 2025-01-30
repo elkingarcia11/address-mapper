@@ -5,10 +5,12 @@ from dotenv import load_dotenv
 
 # Load API keys from .env
 load_dotenv()
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+
+GOOGLE_MAPS_GEO_API_KEY = os.getenv("GOOGLE_MAPS_GEO_API_KEY")
+GOOGLE_MAPS_JS_API_KEY = os.getenv("GOOGLE_MAPS_JS_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not GOOGLE_MAPS_API_KEY or not OPENAI_API_KEY:
+if not GOOGLE_MAPS_GEO_API_KEY or not GOOGLE_MAPS_JS_API_KEY or not OPENAI_API_KEY:
     raise ValueError("Missing required API keys in .env file")
 
 app = Flask(__name__)
@@ -17,7 +19,7 @@ app = Flask(__name__)
 # Load the HTML file dynamically
 @app.route('/')
 def index():
-    return render_template('index.html', google_maps_api_key=GOOGLE_MAPS_API_KEY)
+    return render_template('index.html', google_maps_api_key=GOOGLE_MAPS_JS_API_KEY)
 
 
 @app.route('/extract-addresses', methods=['POST'])
@@ -75,7 +77,7 @@ def geocode():
     for address in addresses:
         response = requests.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": address, "key": GOOGLE_MAPS_API_KEY}
+            params={"address": address, "key": GOOGLE_MAPS_GEO_API_KEY}
         )
         if response.status_code == 200:
             result = response.json()
