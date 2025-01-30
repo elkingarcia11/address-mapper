@@ -1,18 +1,53 @@
+:root {
+  --primary-color: #04a3e3; /* Green */
+  --secondary-color: #fa339c; /* Yellow */
+  --background-color: #edf0f8; /* Light gray */
+  --button-color: #04a3e3; /* Button base color (same as primary) */
+  --button-hover-color: #037db8; /* Darker shade of primary for hover */
+  --button-text-color: #ffffff; /* White text for buttons */
+}
+
+body {
+  background-color: var(--background-color);
+}
+
 textarea {
+  padding: 16px;
   width: 100%;
   box-sizing: border-box;
   max-width: 100%;
   resize: none;
+  border-radius: 8px; /* Rounded corners for a modern look */
 }
+
 button {
-  width: 100%;
-  padding: 10px;
-  font-size: 16px;
-  box-sizing: border-box;
+  width: 100%; /* Full-width button */
+  padding: 12px; /* Slightly increased padding for better spacing */
+  font-size: 16px; /* Font size */
+  box-sizing: border-box; /* Ensures padding doesn't affect width */
+  background-color: var(--primary-color); /* Primary color as background */
+  color: var(--button-text-color); /* Text color (e.g., white) */
+  border: none; /* Remove default borders */
+  border-radius: 8px; /* Rounded corners for a modern look */
+  cursor: pointer; /* Pointer cursor on hover */
+  font-weight: 700; /* Bold text for emphasis */
+  transition: all 0.3s ease; /* Smooth transition for hover effects */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
-h3 {
-  margin-bottom: 0;
+
+/* Hover effect */
+button:hover {
+  background-color: var(--button-hover-color); /* Darker shade on hover */
+  transform: translateY(-1px); /* Slight upward movement */
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15); /* Increased shadow for hover */
 }
+
+/* Active state (when clicked) */
+button:active {
+  transform: translateY(0); /* Reset position */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Return to normal shadow */
+}
+
 #map {
   height: 500px;
   width: 100%;

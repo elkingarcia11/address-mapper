@@ -20,4 +20,4 @@ app.register_blueprint(extract_bp)
 app.register_blueprint(geocode_bp)
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG") == "1")
+    app.run(host="0.0.0.0", port=5001, debug=True)
