@@ -30,21 +30,11 @@ This is a web application that enables users to extract a list of addresses from
    ```
 4. Run the Python server:
    ```sh
-   python server.py
+   python app.py
    ```
 5. Open `http://127.0.0.1:5000/` in your browser.
 6. Paste a block of text into the input field and click the "Convert Blob to Addresses" button to extract addresses.
 7. Click the "Plot Addresses" button to visualize the extracted addresses on the map.
-
-## Running Locally
-
-To run the application locally run the following command in the terminal:
-
-```sh
-python server.py
-```
-
-Then open `http://127.0.0.1:5000/` in your browser.
 
 ## ChatGPT Integration
 
