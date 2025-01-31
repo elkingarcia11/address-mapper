@@ -14,9 +14,7 @@ body {
 }
 
 .container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh; /* Full viewport height */
+  padding: 16px 0px 16px 0px;
 }
 
 textarea {
@@ -90,9 +88,12 @@ button span {
 
 #map {
   flex-grow: 1; /* Take up remaining space */
-  width: 100%; /* Full width */
+  height: 500px;
+  width: 100%;
+  max-width: 100%;
   margin-top: 20px;
-  display: none; /* Hide the map initially */
+  display: none;
+  padding: 0;
 }
 /* Styles for the loading spinner */
 .spinner-container {

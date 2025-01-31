@@ -40,11 +40,6 @@
         </div>
       </section>
 
-      <!-- Loading spinner container -->
-      <div id="spinnerContainer" class="spinner-container">
-        <div class="spinner"></div>
-      </div>
-
       <!-- Address Section -->
       <button id="addressHeader" onclick="toggleSection('addressSection')">
         Plot Addresses on Map:
@@ -57,10 +52,9 @@
         <br />
         <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
       </section>
-
-      <!-- Map Section -->
-      <div id="map"></div>
     </div>
+    <!-- Map Section -->
+    <div id="map"></div>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     <script
       src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"
