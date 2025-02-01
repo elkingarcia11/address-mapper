@@ -7,11 +7,11 @@
   --button-text-color: #ffffff; /* White text for buttons */
   --logout-button-color: red;
   --logout-button-hover-color: darkred;
+  --light-gray-border-color: lightgray;
 }
 
 body {
   background-color: var(--background-color);
-  width: 100%; /* Full-width button */
   overflow-x: hidden; /* Prevent scrolling */
 }
 
@@ -28,6 +28,13 @@ textarea {
   max-width: 100%;
   resize: none;
   border-radius: 8px; /* Rounded corners for a modern look */
+  border-color: var(--light-gray-border-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+textarea:focus {
+  border-color: var(--primary-color); /* Change border color on focus */
+  outline: none; /* Remove default browser outline */
 }
 
 /* Style for the icon */
@@ -85,25 +92,29 @@ button span {
 }
 
 .logoutButton {
-  background-color: var(--logout-button-color);
-  color: var(--button-text-color);
+  border: solid 1px;
+  border-color: var(--light-gray-border-color);
+  color: var(--logout-button-color);
+  background-color: var(--button-text-color);
   padding: 10px;
-  border: none;
   cursor: pointer;
 }
 
 .logoutButton:hover {
-  background-color: var(
-    --logout-button-hover-color
-  ); /* Darker shade on hover */
+  background-color: var(--logout-button-color); /* Darker shade on hover */
+  color: var(--button-text-color);
 }
 
 #blobHeader,
 #addressHeader {
+  display: flex;
   justify-content: space-between;
+  align-items: center;
   background-color: var(--button-text-color);
-  color: var(--secondary-color);
+  color: var(--primary-color);
   margin-top: 16px;
+  border: solid 1px;
+  border-color: lightgray;
 }
 #addressInput {
   margin-top: 0;
