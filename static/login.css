@@ -1,0 +1,43 @@
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  width: 300px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  margin: 10px 0 5px;
+  text-align: left;
+}
+
+input {
+  width: calc(100% - 60px); /* Subtract left and right margins */
+  padding: 12px; /* Slightly increased padding for better spacing */
+  font-size: 16px; /* Font size */
+  margin: 0px 16px 0px 16px;
+  display: flex;
+  justify-content: center;
+  border: none; /* Remove default borders */
+  border: 1px solid #ccc;
+  border-radius: 8px; /* Rounded corners for a modern look */
+  margin-bottom: 10px;
+}

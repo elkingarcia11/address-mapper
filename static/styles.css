@@ -5,6 +5,8 @@
   --button-color: #04a3e3; /* Button base color (same as primary) */
   --button-hover-color: #037db8; /* Darker shade of primary for hover */
   --button-text-color: #ffffff; /* White text for buttons */
+  --logout-button-color: red;
+  --logout-button-hover-color: darkred;
 }
 
 body {
@@ -28,6 +30,11 @@ textarea {
   border-radius: 8px; /* Rounded corners for a modern look */
 }
 
+/* Style for the icon */
+.logout-icon {
+  margin-right: 8px; /* Space between icon and text */
+}
+
 button {
   width: calc(100% - 32px); /* Subtract left and right margins */
   padding: 12px; /* Slightly increased padding for better spacing */
@@ -45,6 +52,11 @@ button {
   transition: all 0.3s ease; /* Smooth transition for hover effects */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
 }
+
+#loginButton {
+  display: block;
+}
+
 p {
   margin-left: 24px;
 }
@@ -66,10 +78,30 @@ button span {
   transition: transform 0.3s ease; /* Smooth rotation effect */
 }
 
+.logoutForm {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.logoutButton {
+  background-color: var(--logout-button-color);
+  color: var(--button-text-color);
+  padding: 10px;
+  border: none;
+  cursor: pointer;
+}
+
+.logoutButton:hover {
+  background-color: var(
+    --logout-button-hover-color
+  ); /* Darker shade on hover */
+}
+
 #blobHeader,
 #addressHeader {
   justify-content: space-between;
-  background-color: white;
+  background-color: var(--button-text-color);
   color: var(--secondary-color);
   margin-top: 16px;
 }
@@ -123,4 +155,9 @@ button span {
   100% {
     transform: rotate(360deg);
   }
+}
+
+.error-message {
+  color: var(--logout-button-color);
+  margin-top: 10px;
 }
