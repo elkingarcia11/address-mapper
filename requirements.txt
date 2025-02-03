@@ -2,3 +2,4 @@ python-dotenv
 flask
 requests
 gunicorn
+google-cloud-storage

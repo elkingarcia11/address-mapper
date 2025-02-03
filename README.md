@@ -53,13 +53,13 @@ The application includes a simple authentication system using Flask sessions. Us
 
 ## Set up Continuous Integration using Google Cloud's Cloud Run and Secret Manager
 
-1. Create a Google Cloud Storage Bucket and add your users.json as a file in the bucket
-2. Store your .env variables one by one in Secret Manager
-3. Connect your repository and configure the Dockerfile as the build type.
-4. Add environment variables in the Cloud Run configuration.
-5. Grant the Cloud Run service account the Secret Manager Secret Accessor role.
-6. Grant the Cloud Run service account access to the GCS bucket
-7. Deploy and verify the application.
+1. Create a Google Cloud Storage Bucket and upload your `users.json` file into the bucket.
+2. Store each of your `.env` variables individually in Google Secret Manager for secure management.
+3. Connect your repository and set up the Dockerfile as the build configuration type.
+4. Add the necessary environment variables in the Cloud Run configuration to ensure your application can access them securely.
+5. Assign the Cloud Run service account the **Secret Manager Secret Accessor** role to allow it to retrieve secrets from Secret Manager.
+6. Grant the Cloud Run service account the appropriate permissions to access the GCS bucket containing your `users.json` file.
+7. Deploy your application and verify that it functions correctly with the secured configuration.
 
 ## ChatGPT Integration
 

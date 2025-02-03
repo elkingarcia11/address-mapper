@@ -16,11 +16,13 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        users = download_users_json()
-        print(users)
-        if username in users and users[username] == password:
-            session["username"] = username
-            return redirect(url_for("index.index"))
-        else:
+        try:
+            users = download_users_json()
+            if username in users and users[username] == password:
+                session["username"] = username
+                return redirect(url_for("index.index"))
+            else:
+                return "Invalid username or password", 401
+        except:
             return "Invalid username or password", 401
     return render_template("login/login.html")
