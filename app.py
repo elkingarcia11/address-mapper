@@ -23,6 +23,3 @@ app.register_blueprint(index_bp)
 app.register_blueprint(login_bp)
 app.register_blueprint(extract_bp)
 app.register_blueprint(geocode_bp)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)

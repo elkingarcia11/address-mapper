@@ -49,6 +49,19 @@ The application includes a simple authentication system using Flask sessions. Us
 7. Paste a block of text into the input field and click the "Convert Blob to Addresses" button to extract addresses.
 8. Click the "Plot Addresses" button to visualize the extracted addresses on the map.
 
+## Set up Continuous Integration using Google Cloud's Cloud Run and Secret Manager
+
+1. Build the Docker image: `docker build -t address-mapper .`
+2. Test locally: `docker run -p 80:80 address-mapper` and visit http://localhost
+3. Deploy to Cloud Run:
+   - Store your users.json as a file in Secret Manager
+   - Store your .env variables one by one in Secret Manager
+   - Connect your repository and configure the Dockerfile as the build source.
+   - Add environment variables in the Cloud Run configuration.
+   - Mount users.json as a volume in the Cloud Run configuration.
+   - Grant the Cloud Run service account the Secret Manager Secret Accessor role.
+   - Deploy and verify the application.
+
 ## ChatGPT Integration
 
 This application uses OpenAI's GPT model to extract addresses from blocks of text. When you paste a block of text into the input field and click the "Convert Blob to Addresses" button, the GPT model processes the text and returns the addresses found within it. The extracted addresses are then displayed in the second text area, where they can be geocoded and visualized on the map.
