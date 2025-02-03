@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session
-from utils.login_utils import load_users
+from utils.login_utils import download_users_json
 
 # Create a blueprint for login routes
 login_bp = Blueprint('login', __name__)
@@ -16,7 +16,8 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-        users = load_users()
+        users = download_users_json()
+        print(users)
         if username in users and users[username] == password:
             session["username"] = username
             return redirect(url_for("index.index"))

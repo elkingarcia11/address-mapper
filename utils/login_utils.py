@@ -1,17 +1,14 @@
 import os
 import json
-
-# Load user data from a JSON file (for simplicity)
-USER_DATA_FILE = "users.json"
-
-
-def load_users():
-    if not os.path.exists(USER_DATA_FILE):
-        return {}
-    with open(USER_DATA_FILE, "r") as file:
-        return json.load(file)
+from google.cloud import storage
+from os import getenv
 
 
-def save_users(users):
-    with open(USER_DATA_FILE, "w") as file:
-        json.dump(users, file)
+# Load user data from a JSON file in a Google Cloud Storage Bucket
+def download_users_json():
+    """Download and decrypt the users.json file from GCS."""
+    client = storage.Client()
+    bucket = client.bucket(getenv("USERS_BUCKET_NAME"))
+    blob = bucket.blob(getenv("USERS_FILE_NAME"))
+
+    return json.loads(blob.download_as_text)

@@ -35,6 +35,8 @@ The application includes a simple authentication system using Flask sessions. Us
    GOOGLE_MAPS_JS_API_KEY=your_google_maps_js_api_key
    GOOGLE_MAPS_GEO_API_KEY=your_google_maps_geo_api_key
    OPENAI_API_KEY=your_openai_api_key
+   USERS_FILE_NAME=your_file_name.json
+   USERS_BUCKET_NAME=your_gcs_bucket_name
    ```
 3. Install dependencies:
    ```sh
@@ -51,16 +53,13 @@ The application includes a simple authentication system using Flask sessions. Us
 
 ## Set up Continuous Integration using Google Cloud's Cloud Run and Secret Manager
 
-1. Build the Docker image: `docker build -t address-mapper .`
-2. Test locally: `docker run -p 80:80 address-mapper` and visit http://localhost
-3. Deploy to Cloud Run:
-   - Store your users.json as a file in Secret Manager
-   - Store your .env variables one by one in Secret Manager
-   - Connect your repository and configure the Dockerfile as the build source.
-   - Add environment variables in the Cloud Run configuration.
-   - Mount users.json as a volume in the Cloud Run configuration.
-   - Grant the Cloud Run service account the Secret Manager Secret Accessor role.
-   - Deploy and verify the application.
+1. Create a Google Cloud Storage Bucket and add your users.json as a file in the bucket
+2. Store your .env variables one by one in Secret Manager
+3. Connect your repository and configure the Dockerfile as the build type.
+4. Add environment variables in the Cloud Run configuration.
+5. Grant the Cloud Run service account the Secret Manager Secret Accessor role.
+6. Grant the Cloud Run service account access to the GCS bucket
+7. Deploy and verify the application.
 
 ## ChatGPT Integration
 
