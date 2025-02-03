@@ -18,6 +18,7 @@ def login():
         password = request.form.get("password")
         try:
             users = download_users_json()
+            print(users)
             if username in users and users[username] == password:
                 session["username"] = username
                 return redirect(url_for("index.index"))
