@@ -131,10 +131,10 @@ button span {
 
 #map {
   flex-grow: 1; /* Take up remaining space */
-  height: 500px;
-  width: 100%;
+  height: calc(100vh - 200px); /* Subtract header and container heights */
+  width: calc(100% - 32px); /* Match button width */
   max-width: 100%;
-  margin-top: 20px;
+  margin: 20px 16px 0 16px; /* Match button margins */
   display: none;
   padding: 0;
 }

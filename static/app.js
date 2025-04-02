@@ -2,6 +2,9 @@ let map;
 let activeInfoWindow = null;
 
 function initMap() {
+  const spinnerContainer = document.getElementById("spinnerContainer");
+  spinnerContainer.style.display = "flex"; // Show spinner while map loads
+  
   // Define a style to hide Points of Interest (POIs)
   const mapStyle = [
     {
@@ -29,6 +32,7 @@ function initMap() {
   // Listen for the 'idle' event to ensure the map is fully loaded
   google.maps.event.addListenerOnce(map, "idle", () => {
     console.log("Map is ready!");
+    spinnerContainer.style.display = "none"; // Hide spinner when map is ready
   });
 }
 
@@ -108,11 +112,11 @@ async function geocodeAddresses() {
       });
     });
     document.getElementById("map").style.display = "block"; // Show the map
+    spinnerContainer.style.display = "none"; // Hide spinner when map is displayed
   } catch (error) {
     console.error("Failed to geocode addresses:", error);
     alert(`Error: ${error.message}`);
-  } finally {
-    spinnerContainer.style.display = "none";
+    spinnerContainer.style.display = "none"; // Hide spinner on error
   }
 }
 
