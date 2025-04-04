@@ -21,6 +21,11 @@
   </head>
 
   <body>
+    <!-- Loading spinner container - moved here to be global -->
+    <div id="spinnerContainer" class="spinner-container">
+      <div class="spinner"></div>
+    </div>
+    
     <!-- Logout Button with Icon -->
      <div class="logoutForm">
       <form action="/logout" method="POST">
@@ -45,11 +50,6 @@
         <textarea id="blobInput" rows="10" cols="50"></textarea>
         <br />
         <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
-
-        <!-- Loading spinner container -->
-        <div id="spinnerContainer" class="spinner-container">
-          <div class="spinner"></div>
-        </div>
       </section>
 
       <!-- Address Section -->
