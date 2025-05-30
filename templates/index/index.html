@@ -25,18 +25,34 @@
     <div id="spinnerContainer" class="spinner-container">
       <div class="spinner"></div>
     </div>
-    
-    <!-- Logout Button with Icon -->
-     <div class="logoutForm">
-      <form action="/logout" method="POST">
-        <button type="submit" class="logoutButton">
-          <i class="fas fa-sign-out-alt logout-icon"></i> Logout
-        </button>
-      </form>
-     </div>
-    </div>
 
     <div class="container">
+      <!-- API Keys Section -->
+      <button
+        id="apiHeader"
+        onclick="toggleSection('apiSection')"
+        role="button"
+      >
+        API Configuration:
+        <span id="apiSectionIndicator" class="chevron">▼</span>
+      </button>
+      <section id="apiSection" class="hidden">
+        <div class="api-keys-container">
+          <div class="api-key-group">
+            <label for="googleMapsGeoApiKey">Google Maps Geocoding API Key:</label>
+            <input type="password" id="googleMapsGeoApiKey" placeholder="Enter your Google Maps Geocoding API key" />
+          </div>
+          <div class="api-key-group">
+            <label for="googleMapsJsApiKey">Google Maps JavaScript API Key:</label>
+            <input type="password" id="googleMapsJsApiKey" placeholder="Enter your Google Maps JavaScript API key" />
+          </div>
+          <div class="api-key-group">
+            <label for="openaiApiKey">OpenAI API Key:</label>
+            <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" />
+          </div>
+        </div>
+      </section>
+
       <!-- Blob Section -->
       <button
         id="blobHeader"
@@ -68,10 +84,5 @@
     <!-- Map Section -->
     <div id="map"></div>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
-    <script
-      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap"
-      async
-      defer
-    ></script>
   </body>
 </html>

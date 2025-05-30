@@ -4,3 +4,5 @@ routes/__pycache__
 utils/__pycache__
 .DS_Store
 templates/.DS_Store
+__pycache__
+venv/

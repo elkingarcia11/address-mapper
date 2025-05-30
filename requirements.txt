@@ -1,5 +1,6 @@
 python-dotenv 
 flask
+flask-cors
 requests
 gunicorn
 google-cloud-storage

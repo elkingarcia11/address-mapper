@@ -1,6 +1,69 @@
 let map;
 let activeInfoWindow = null;
 let mapInitialized = false;
+let googleMapsLoaded = false;
+
+// Function to get API keys from input fields
+function getApiKeys() {
+  return {
+    googleMapsGeo: document.getElementById("googleMapsGeoApiKey").value.trim(),
+    googleMapsJs: document.getElementById("googleMapsJsApiKey").value.trim(),
+    openai: document.getElementById("openaiApiKey").value.trim()
+  };
+}
+
+// Function to validate API keys
+function validateApiKeys(requiredKeys = []) {
+  const apiKeys = getApiKeys();
+  const missing = [];
+  
+  requiredKeys.forEach(key => {
+    if (!apiKeys[key]) {
+      missing.push(key);
+    }
+  });
+  
+  if (missing.length > 0) {
+    alert(`Please provide the following API keys: ${missing.join(', ')}`);
+    return false;
+  }
+  
+  return true;
+}
+
+// Function to dynamically load Google Maps
+function loadGoogleMapsIfNeeded() {
+  return new Promise((resolve, reject) => {
+    if (!validateApiKeys(['googleMapsJs'])) {
+      reject(new Error('Google Maps JavaScript API key is required'));
+      return;
+    }
+    
+    if (googleMapsLoaded) {
+      resolve();
+      return;
+    }
+    
+    const apiKeys = getApiKeys();
+    
+    // Set up the global callback before loading the script
+    window.initMapCallback = function() {
+      initMap();
+      resolve();
+    };
+    
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKeys.googleMapsJs}&callback=initMapCallback`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = function() {
+      reject(new Error('Failed to load Google Maps. Please check your API key.'));
+    };
+    
+    document.head.appendChild(script);
+    googleMapsLoaded = true;
+  });
+}
 
 // Check and expand the address section if there's text in the input field
 function checkAndExpandAddressSection() {
@@ -55,19 +118,34 @@ function initMap() {
 }
 
 async function extractAddresses() {
+  if (!validateApiKeys(['openai'])) {
+    return;
+  }
+  
   const text = document.getElementById("blobInput").value;
+  const apiKeys = getApiKeys();
   const spinnerContainer = document.getElementById("spinnerContainer");
+  
   spinnerContainer.style.display = "flex"; // Display the spinner
+  
   try {
     const response = await fetch("/extract-addresses", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest" // CSRF protection
+      },
+      body: JSON.stringify({ 
+        text: text,
+        openai_api_key: apiKeys.openai
+      }),
     });
+    
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to extract addresses");
     }
+    
     const data = await response.json();
     document.getElementById("addressInput").value = data.addresses;
     
@@ -82,35 +160,48 @@ async function extractAddresses() {
 }
 
 async function geocodeAddresses() {
+  if (!validateApiKeys(['googleMapsGeo', 'googleMapsJs'])) {
+    return;
+  }
+  
   const addresses = document.getElementById("addressInput").value.split("\n");
+  const apiKeys = getApiKeys();
   const spinnerContainer = document.getElementById("spinnerContainer");
   const mapElement = document.getElementById("map");
   
   spinnerContainer.style.display = "flex"; // Display the spinner
   
   try {
+    // Load Google Maps if not already loaded
+    if (!map) {
+      await loadGoogleMapsIfNeeded();
+    }
+    
     const response = await fetch("/geocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addresses }),
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest" // CSRF protection
+      },
+      body: JSON.stringify({ 
+        addresses: addresses,
+        google_maps_geo_api_key: apiKeys.googleMapsGeo
+      }),
     });
+    
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.error || "Failed to geocode addresses");
     }
+    
     const data = await response.json();
     const results = data.results;
-
-    if (!map) {
-      console.error("Map is not initialized yet.");
-      spinnerContainer.style.display = "none";
-      return;
-    }
 
     // Clear existing markers
     if (map) {
       map.setCenter({ lat: 40.8448, lng: -73.8648 }); // Reset map center
     }
+    
     results.forEach((result, index) => {
       if (result.error) {
         console.error(`Geocoding failed for: ${result.address}`);
