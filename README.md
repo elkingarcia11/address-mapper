@@ -48,6 +48,26 @@ The application has been designed with security in mind for handling user-provid
 7. Paste a block of text into the input field and click "Convert" to extract addresses using OpenAI.
 8. Click "Plot" to visualize the extracted addresses on the map using Google Maps geocoding.
 
+## Docker Testing Locally
+
+To test the application using Docker:
+
+1. Build the Docker image:
+
+   ```sh
+   docker build -t address-mapper .
+   ```
+
+2. Run the Docker container:
+
+   ```sh
+   docker run -p 8080:80 address-mapper
+   ```
+
+3. Visit `http://localhost:8080` in your browser to access the application.
+
+The Docker container uses Gunicorn as the WSGI server and exposes the application on port 80 internally, which is mapped to port 8080 on your local machine.
+
 ## API Key Requirements
 
 ### Google Maps API Keys
