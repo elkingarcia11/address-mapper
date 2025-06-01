@@ -179,10 +179,12 @@ button span {
   margin-top: 0;
 }
 
+/* Removed to fix button group consistency
 #blobSubmit,
 #addressSubmit {
   margin-bottom: 16px;
 }
+*/
 
 .hidden {
   display: none;
@@ -230,4 +232,62 @@ button span {
 .error-message {
   color: var(--logout-button-color);
   margin-top: 10px;
+}
+
+/* Button group styling */
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin: 0 16px 16px 16px;
+}
+
+.button-group button {
+  flex: 1;
+  margin: 0;
+}
+
+/* Clear button styling */
+.clear-button {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+.clear-button:hover {
+  background-color: #5a6268 !important;
+}
+
+/* Disabled button styling */
+button:disabled {
+  background-color: #e9ecef !important;
+  color: #6c757d !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+button:disabled:hover {
+  background-color: #e9ecef !important;
+  color: #6c757d !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Clear map button container */
+#clearMapContainer {
+  margin: 16px;
+  text-align: center;
+}
+
+#clearMapButton {
+  width: auto;
+  padding: 8px 16px;
+  margin: 0;
+  background-color: #dc3545;
+  color: white;
+  font-size: 14px;
+}
+
+#clearMapButton:hover {
+  background-color: #c82333;
 }

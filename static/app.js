@@ -151,6 +151,7 @@ async function extractAddresses() {
     
     // Expand the address section after extracting addresses
     checkAndExpandAddressSection();
+    updateButtonStates();
   } catch (error) {
     console.error("Failed to extract addresses:", error);
     alert(`Error: ${error.message}`);
@@ -197,7 +198,15 @@ async function geocodeAddresses() {
     const data = await response.json();
     const results = data.results;
 
-    // Clear existing markers
+    // Clear existing markers before adding new ones
+    if (markers.length > 0) {
+      markers.forEach(marker => {
+        marker.setMap(null);
+      });
+      markers = [];
+    }
+    
+    // Reset map center
     if (map) {
       map.setCenter({ lat: 40.8448, lng: -73.8648 }); // Reset map center
     }
@@ -212,6 +221,10 @@ async function geocodeAddresses() {
         map: map,
         title: result.street_address,
       });
+      
+      // Store marker in global array
+      markers.push(marker);
+      
       // Center the map on the first address
       if (index === 0) {
         map.setCenter({ lat: result.latitude, lng: result.longitude });
@@ -230,6 +243,11 @@ async function geocodeAddresses() {
     
     // Show the map
     mapElement.style.display = "block";
+    
+    // Show the clear map button if there are markers
+    if (markers.length > 0) {
+      document.getElementById("clearMapContainer").style.display = "block";
+    }
     
     // If map is already initialized, hide spinner now
     if (mapInitialized) {
@@ -262,17 +280,94 @@ function toggleSection(sectionId) {
   }
 }
 
+// Function to check and update button states based on input content
+function updateButtonStates() {
+  const blobInput = document.getElementById("blobInput");
+  const addressInput = document.getElementById("addressInput");
+  const convertButton = document.getElementById("buttonSubmit");
+  const plotButton = document.getElementById("addressSubmit");
+  const clearBlobButton = document.getElementById("clearBlobButton");
+  const clearAddressButton = document.getElementById("clearAddressButton");
+  
+  // Check blob input and update convert/clear buttons
+  const blobHasContent = blobInput.value.trim() !== "";
+  convertButton.disabled = !blobHasContent;
+  clearBlobButton.disabled = !blobHasContent;
+  
+  // Check address input and update plot/clear buttons
+  const addressHasContent = addressInput.value.trim() !== "";
+  plotButton.disabled = !addressHasContent;
+  clearAddressButton.disabled = !addressHasContent;
+}
+
 // Set up event listeners when the document is loaded
 document.addEventListener("DOMContentLoaded", function() {
   const addressInput = document.getElementById("addressInput");
+  const blobInput = document.getElementById("blobInput");
   
   // Add event listeners to check and expand section when text is added
-  addressInput.addEventListener("input", checkAndExpandAddressSection);
+  addressInput.addEventListener("input", function() {
+    checkAndExpandAddressSection();
+    updateButtonStates();
+  });
   addressInput.addEventListener("paste", function() {
     // Use setTimeout to allow the paste operation to complete first
-    setTimeout(checkAndExpandAddressSection, 0);
+    setTimeout(function() {
+      checkAndExpandAddressSection();
+      updateButtonStates();
+    }, 0);
+  });
+  
+  // Add event listeners for blob input
+  blobInput.addEventListener("input", updateButtonStates);
+  blobInput.addEventListener("paste", function() {
+    setTimeout(updateButtonStates, 0);
   });
   
   // Check on page load
   checkAndExpandAddressSection();
+  updateButtonStates();
 });
+
+// Clear functions
+function clearBlobInput() {
+  document.getElementById("blobInput").value = "";
+  updateButtonStates();
+}
+
+function clearAddressInput() {
+  document.getElementById("addressInput").value = "";
+  // Also collapse the address section if it's empty
+  const addressSection = document.getElementById("addressSection");
+  const indicator = document.getElementById("addressSectionIndicator");
+  
+  if (!addressSection.classList.contains("hidden")) {
+    addressSection.classList.add("hidden");
+    indicator.textContent = "▼"; // Chevron down when hidden
+  }
+  
+  updateButtonStates();
+}
+
+// Global variable to store markers
+let markers = [];
+
+function clearMap() {
+  if (map && markers.length > 0) {
+    // Clear all markers from the map
+    markers.forEach(marker => {
+      marker.setMap(null);
+    });
+    markers = []; // Reset the markers array
+    
+    // Reset map center and zoom
+    map.setCenter({ lat: 40.8448, lng: -73.8648 }); // Default center (Bronx)
+    map.setZoom(12);
+    
+    // Hide both the map and the clear map button
+    document.getElementById("map").style.display = "none";
+    document.getElementById("clearMapContainer").style.display = "none";
+    
+    console.log("Map cleared and hidden successfully");
+  }
+}

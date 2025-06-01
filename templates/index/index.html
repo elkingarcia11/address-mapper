@@ -65,7 +65,10 @@
       <section id="blobSection" class="hidden">
         <textarea id="blobInput" rows="10" cols="50"></textarea>
         <br />
-        <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
+        <div class="button-group">
+          <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
+          <button id="clearBlobButton" onclick="clearBlobInput()" class="clear-button">Clear Input</button>
+        </div>
       </section>
 
       <!-- Address Section -->
@@ -78,11 +81,18 @@
         <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
         <textarea id="addressInput" rows="10" cols="50"></textarea>
         <br />
-        <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
+        <div class="button-group">
+          <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
+          <button id="clearAddressButton" onclick="clearAddressInput()" class="clear-button">Clear Input</button>
+        </div>
       </section>
     </div>
     <!-- Map Section -->
     <div id="map"></div>
+    <!-- Clear Map Button -->
+    <div id="clearMapContainer" style="display: none;">
+      <button id="clearMapButton" onclick="clearMap()" class="clear-button">Clear Map</button>
+    </div>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>
