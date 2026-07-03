@@ -229,3 +229,280 @@ def optimize_route(
         "distance_source": "openrouteservice",
         "profile": profile,
     }
+
+
+def optimize_multi_route(
+    depot: Location,
+    stops: Sequence[Location],
+    route_capacities: Sequence[int],
+    *,
+    api_key: str,
+    profile: str = "driving-car",
+    time_limit_seconds: int = 30,
+    ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
+) -> dict:
+    """Split stops across multiple routes from a shared depot, minimizing total distance.
+
+    Every route starts and ends at the same depot location.
+    """
+    if not route_capacities:
+        raise ValueError("At least one route capacity is required.")
+    if any(capacity < 1 for capacity in route_capacities):
+        raise ValueError("Each route must have at least one stop.")
+    if sum(route_capacities) != len(stops):
+        raise ValueError(
+            f"Sum of route capacities ({sum(route_capacities)}) must equal "
+            f"the number of stops ({len(stops)})."
+        )
+
+    num_routes = len(route_capacities)
+    locations = [depot, *stops]
+    depot_index = 0
+
+    distance_matrix = build_distance_matrix_ors(
+        locations,
+        api_key=api_key,
+        profile=profile,
+        chunk_size=ors_chunk_size,
+    )
+
+    manager = pywrapcp.RoutingIndexManager(
+        len(locations),
+        num_routes,
+        depot_index,
+    )
+    routing = pywrapcp.RoutingModel(manager)
+
+    def distance_callback(from_index: int, to_index: int) -> int:
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return distance_matrix[from_node][to_node]
+
+    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+
+    def stop_demand_callback(from_index: int) -> int:
+        from_node = manager.IndexToNode(from_index)
+        return 0 if from_node == depot_index else 1
+
+    stop_callback_index = routing.RegisterUnaryTransitCallback(stop_demand_callback)
+    routing.AddDimensionWithVehicleCapacity(
+        stop_callback_index,
+        0,
+        list(route_capacities),
+        True,
+        "StopsDimension",
+    )
+
+    stops_dimension = routing.GetDimensionOrDie("StopsDimension")
+    for vehicle_id, target_stops in enumerate(route_capacities):
+        routing.Solver().Add(
+            stops_dimension.CumulVar(routing.End(vehicle_id)) == target_stops
+        )
+
+    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+    )
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    )
+    search_parameters.time_limit.FromSeconds(time_limit_seconds)
+
+    solution = routing.SolveWithParameters(search_parameters)
+    if solution is None:
+        raise RuntimeError(
+            "No solution found. Check that route capacities sum to the total "
+            "number of stops and that all coordinates are reachable."
+        )
+
+    routes: list[dict] = []
+    total_distance = 0
+
+    for vehicle_id in range(num_routes):
+        ordered_indices: list[int] = []
+        route_distance = 0
+        index = routing.Start(vehicle_id)
+
+        while not routing.IsEnd(index):
+            node = manager.IndexToNode(index)
+            ordered_indices.append(node)
+            previous = index
+            index = solution.Value(routing.NextVar(index))
+            route_distance += routing.GetArcCostForVehicle(
+                previous, index, vehicle_id
+            )
+
+        ordered_indices.append(manager.IndexToNode(index))
+        total_distance += route_distance
+
+        stop_indices = [i for i in ordered_indices if i != depot_index]
+        routes.append({
+            "route_number": vehicle_id + 1,
+            "target_stops": route_capacities[vehicle_id],
+            "ordered_indices": ordered_indices,
+            "stop_indices": stop_indices,
+            "ordered_locations": [locations[i].to_dict() for i in ordered_indices],
+            "ordered_coordinates": [
+                [locations[i].lat, locations[i].lng] for i in ordered_indices
+            ],
+            "stop_order": [i - 1 for i in stop_indices],
+            "ordered_stop_labels": [locations[i].label for i in stop_indices],
+            "distance_meters": route_distance,
+        })
+
+    return {
+        "depot": depot.to_dict(),
+        "routes": routes,
+        "route_capacities": list(route_capacities),
+        "split_mode": "manual",
+        "total_distance_meters": total_distance,
+        "distance_source": "openrouteservice",
+        "profile": profile,
+    }
+
+
+def optimize_balanced_multi_route(
+    depot: Location,
+    stops: Sequence[Location],
+    num_routes: int,
+    *,
+    api_key: str,
+    profile: str = "driving-car",
+    time_limit_seconds: int = 30,
+    ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
+    balance_weight: int = 100,
+) -> dict:
+    """Split stops across routes from a shared depot, balancing driving distance per route.
+
+    Every route starts and ends at the same depot location.
+    """
+    if num_routes < 1:
+        raise ValueError("At least one route is required.")
+    if not stops:
+        raise ValueError("At least one stop is required.")
+    if num_routes > len(stops):
+        raise ValueError(
+            f"Cannot create {num_routes} routes with only {len(stops)} stop(s). "
+            "Each route needs at least one stop."
+        )
+
+    locations = [depot, *stops]
+    depot_index = 0
+
+    distance_matrix = build_distance_matrix_ors(
+        locations,
+        api_key=api_key,
+        profile=profile,
+        chunk_size=ors_chunk_size,
+    )
+
+    manager = pywrapcp.RoutingIndexManager(
+        len(locations),
+        num_routes,
+        depot_index,
+    )
+    routing = pywrapcp.RoutingModel(manager)
+
+    def distance_callback(from_index: int, to_index: int) -> int:
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return distance_matrix[from_node][to_node]
+
+    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+
+    max_route_distance = sum(
+        distance_matrix[i][j]
+        for i in range(len(locations))
+        for j in range(len(locations))
+    )
+    routing.AddDimension(
+        transit_callback_index,
+        0,
+        max_route_distance,
+        True,
+        "Distance",
+    )
+    distance_dimension = routing.GetDimensionOrDie("Distance")
+    distance_dimension.SetGlobalSpanCostCoefficient(balance_weight)
+
+    def stop_demand_callback(from_index: int) -> int:
+        from_node = manager.IndexToNode(from_index)
+        return 0 if from_node == depot_index else 1
+
+    stop_callback_index = routing.RegisterUnaryTransitCallback(stop_demand_callback)
+    routing.AddDimensionWithVehicleCapacity(
+        stop_callback_index,
+        0,
+        [len(stops)] * num_routes,
+        True,
+        "StopsDimension",
+    )
+    stops_dimension = routing.GetDimensionOrDie("StopsDimension")
+    for vehicle_id in range(num_routes):
+        routing.Solver().Add(
+            stops_dimension.CumulVar(routing.End(vehicle_id)) >= 1
+        )
+
+    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+    )
+    search_parameters.local_search_metaheuristic = (
+        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+    )
+    search_parameters.time_limit.FromSeconds(time_limit_seconds)
+
+    solution = routing.SolveWithParameters(search_parameters)
+    if solution is None:
+        raise RuntimeError(
+            "No solution found. Check that all coordinates are reachable and "
+            "that the number of routes does not exceed the number of stops."
+        )
+
+    routes: list[dict] = []
+    total_distance = 0
+
+    for vehicle_id in range(num_routes):
+        ordered_indices: list[int] = []
+        route_distance = 0
+        index = routing.Start(vehicle_id)
+
+        while not routing.IsEnd(index):
+            node = manager.IndexToNode(index)
+            ordered_indices.append(node)
+            previous = index
+            index = solution.Value(routing.NextVar(index))
+            route_distance += routing.GetArcCostForVehicle(
+                previous, index, vehicle_id
+            )
+
+        ordered_indices.append(manager.IndexToNode(index))
+        total_distance += route_distance
+
+        stop_indices = [i for i in ordered_indices if i != depot_index]
+        routes.append({
+            "route_number": vehicle_id + 1,
+            "target_stops": len(stop_indices),
+            "ordered_indices": ordered_indices,
+            "stop_indices": stop_indices,
+            "ordered_locations": [locations[i].to_dict() for i in ordered_indices],
+            "ordered_coordinates": [
+                [locations[i].lat, locations[i].lng] for i in ordered_indices
+            ],
+            "stop_order": [i - 1 for i in stop_indices],
+            "ordered_stop_labels": [locations[i].label for i in stop_indices],
+            "distance_meters": route_distance,
+        })
+
+    return {
+        "depot": depot.to_dict(),
+        "routes": routes,
+        "route_capacities": [route["target_stops"] for route in routes],
+        "split_mode": "balanced_distance",
+        "num_routes": num_routes,
+        "total_distance_meters": total_distance,
+        "distance_source": "openrouteservice",
+        "profile": profile,
+    }

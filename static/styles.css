@@ -238,6 +238,36 @@ body {
   color: var(--text);
 }
 
+.panel-card--form {
+  overflow-y: auto;
+}
+
+.panel-section--stops textarea {
+  min-height: 160px;
+  max-height: 280px;
+  resize: vertical;
+}
+
+.section-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.section-label-row .section-label {
+  margin: 0;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  text-align: right;
+}
+
 /* API section */
 .api-section {
   padding: var(--space-md);
@@ -245,6 +275,48 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   gap: var(--space-md);
+}
+
+.api-section--collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
+.api-section__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.api-section__summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-section__summary::after {
+  content: "+";
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.api-section--collapsible[open] .api-section__summary::after {
+  content: "−";
+}
+
+.api-section--collapsible[open] .api-section__summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.api-section--collapsible .field-grid {
+  padding: var(--space-md);
 }
 
 .api-section .section-label {
@@ -255,6 +327,122 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-md);
+}
+
+.field-grid--compact {
+  margin-bottom: var(--space-sm);
+}
+
+.field-group--full {
+  grid-column: 1 / -1;
+}
+
+.field-group select {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.route-capacities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-sm);
+}
+
+.route-capacity-summary {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+}
+
+.route-capacity-summary--match {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.route-capacity-summary--mismatch {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.field-group input[type="number"] {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field-group input[type="number"]:hover {
+  border-color: var(--border-strong);
+}
+
+.field-group input[type="number"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.field-group input[type="text"]:disabled {
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  cursor: not-allowed;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.panel-hint--inline {
+  margin: 0 0 var(--space-sm);
+}
+
+.panel-actions--end {
+  margin-top: auto;
+  padding-top: var(--space-md);
+  justify-content: flex-start;
+}
+
+.panel-actions--end .btn {
+  flex: 0 0 auto;
+  min-width: 132px;
 }
 
 .field-group {
@@ -270,6 +458,7 @@ body {
 }
 
 .field-group input[type="password"],
+.field-group input[type="text"],
 textarea {
   width: 100%;
   padding: 12px 14px;
@@ -282,12 +471,76 @@ textarea {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.password-field {
+  position: relative;
+  width: 100%;
+}
+
+.password-field input[type="password"],
+.password-field input[type="text"] {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.password-toggle:focus-visible {
+  outline: none;
+  color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(4, 163, 227, 0.12);
+}
+
+.password-toggle__icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.password-toggle__icon--hide {
+  display: none;
+}
+
+.password-toggle[aria-pressed="true"] .password-toggle__icon--show {
+  display: none;
+}
+
+.password-toggle[aria-pressed="true"] .password-toggle__icon--hide {
+  display: block;
+}
+
 .field-group input[type="password"]:hover,
+.field-group input[type="text"]:hover,
 textarea:hover {
   border-color: var(--border-strong);
 }
 
 .field-group input[type="password"]:focus,
+.field-group input[type="text"]:focus,
 textarea:focus {
   outline: none;
   border-color: var(--primary);
@@ -554,6 +807,15 @@ textarea::placeholder {
 
   .field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-label-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .field-hint {
+    text-align: left;
   }
 
   .panel-header--row {

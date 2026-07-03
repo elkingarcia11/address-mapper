@@ -139,14 +139,14 @@
 
           <!-- Optimize -->
           <section id="tab-optimize" class="tab-panel" role="tabpanel">
-            <div class="panel-card">
+            <div class="panel-card panel-card--form">
               <div class="panel-header">
                 <h2>Optimize Route</h2>
-                <p class="panel-hint">One sanitized address per line: <em>street address, city, ST ZIP</em> (example: <em>2249 Washington Ave, Bronx, NY 10456</em>). The <strong>first</strong> is the start, the <strong>last</strong> is the end; middle stops are reordered to minimize driving distance.</p>
+                <p class="panel-hint">Use the format <em>street address, city, ST ZIP</em>. Set a start and end for every route, then list stops to split across routes below.</p>
               </div>
 
-              <div class="panel-section api-section">
-                <h3 class="section-label">API Configuration</h3>
+              <details class="panel-section api-section api-section--collapsible">
+                <summary class="api-section__summary">API Configuration</summary>
                 <div class="field-grid">
                   <div class="field-group">
                     <label for="googleMapsGeoApiKeyOptimize">Google Maps Geocoding API Key</label>
@@ -157,15 +157,61 @@
                     <input type="password" id="orsApiKey" placeholder="Enter your OpenRouteService API key" />
                   </div>
                 </div>
+              </details>
+
+              <div class="panel-section">
+                <h3 class="section-label">Route Configuration</h3>
+                <div class="field-grid field-grid--compact">
+                  <div class="field-group">
+                    <label for="numRoutes">Number of routes</label>
+                    <input type="number" id="numRoutes" min="1" max="50" value="2" />
+                  </div>
+                  <div class="field-group">
+                    <label for="splitMode">Stop assignment</label>
+                    <select id="splitMode">
+                      <option value="manual">Specify stops per route</option>
+                      <option value="balanced_distance">Balance routes by distance</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="section-label-row">
+                  <label class="section-label" for="routeCapacitySummary">Assignment summary</label>
+                  <p class="field-hint">Enter start, end, and at least one stop address.</p>
+                </div>
+                <p id="routeCapacitySummary" class="route-capacity-summary" aria-live="polite">Add stop addresses to see assignment status.</p>
+                <div id="routeCapacitiesContainer" class="route-capacities"></div>
               </div>
 
-              <div class="panel-section panel-section--grow">
+              <div class="panel-section">
+                <h3 class="section-label">Route Endpoints</h3>
+                <div class="field-grid field-grid--compact">
+                  <div class="field-group">
+                    <label for="optimizeStartInput">Start</label>
+                    <input type="text" id="optimizeStartInput" placeholder="2249 Washington Ave, Bronx, NY 10456" autocomplete="off" />
+                  </div>
+                  <div class="field-group">
+                    <label for="optimizeEndInput">End</label>
+                    <input type="text" id="optimizeEndInput" placeholder="2249 Washington Ave, Bronx, NY 10456" autocomplete="off" />
+                  </div>
+                  <div class="field-group field-group--full">
+                    <label class="checkbox-label">
+                      <input type="checkbox" id="optimizeEndSameAsStart" checked />
+                      End same as start
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section panel-section--stops">
                 <div id="optimizeResultBanner" class="result-banner hidden"></div>
-                <label class="section-label" for="optimizeInput">Addresses</label>
-                <textarea id="optimizeInput" rows="10" placeholder="2249 Washington Ave, Bronx, NY 10456"></textarea>
+                <div class="section-label-row">
+                  <label class="section-label" for="optimizeInput">Stops</label>
+                  <p class="field-hint">One stop address per line. These are split across routes.</p>
+                </div>
+                <textarea id="optimizeInput" rows="8" placeholder="100 Grand Concourse, Bronx, NY 10451&#10;450 East 169th Street, Bronx, NY 10456"></textarea>
               </div>
 
-              <div class="panel-actions">
+              <div class="panel-actions panel-actions--end">
                 <button id="optimizeSubmit" class="btn btn-primary" onclick="optimizeRoute()">Optimize</button>
                 <button id="clearOptimizeButton" class="btn btn-secondary" onclick="clearOptimizeInput()">Clear Input</button>
               </div>
@@ -182,7 +228,7 @@
 
               <div class="panel-section panel-section--grow">
                 <p id="optimizeDistance" class="results-distance hidden"></p>
-                <label class="section-label results-output-label hidden" for="optimizeOutput">Optimized Order</label>
+                <label class="section-label results-output-label hidden" for="optimizeOutput">Optimized Routes</label>
                 <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
               </div>
             </div>

@@ -22,6 +22,10 @@ _US_ADDRESS_RE = re.compile(
     r"^(?P<street>.+?),\s*(?P<city>[^,]+),\s*(?P<state>[A-Z]{2})\s+(?P<zip>\d{5}(?:-\d{4})?)\s*$",
     re.I,
 )
+_US_ADDRESS_NO_ZIP_RE = re.compile(
+    r"^(?P<street>.+?),\s*(?P<city>[^,]+),\s*(?P<state>[A-Z]{2})\s*$",
+    re.I,
+)
 
 
 def format_address(street, city, state, zip_code):
@@ -51,18 +55,32 @@ def cleanse_address_line(line):
     return re.sub(r"\s*,\s*", ", ", line)
 
 
-def standardize_address_line(line):
-    cleaned = cleanse_address_line(line)
-    if not cleaned:
-        return ""
-    match = _US_ADDRESS_RE.match(cleaned)
-    if match:
+def _format_parsed_address(match, *, include_zip: bool) -> str:
+    if include_zip:
         return format_address(
             match.group("street"),
             match.group("city"),
             match.group("state"),
             match.group("zip"),
         )
+    return format_address(
+        match.group("street"),
+        match.group("city"),
+        match.group("state"),
+        "",
+    )
+
+
+def standardize_address_line(line):
+    cleaned = cleanse_address_line(line)
+    if not cleaned:
+        return ""
+    match = _US_ADDRESS_RE.match(cleaned)
+    if match:
+        return _format_parsed_address(match, include_zip=True)
+    match = _US_ADDRESS_NO_ZIP_RE.match(cleaned)
+    if match:
+        return _format_parsed_address(match, include_zip=False)
     return cleaned
 
 
@@ -79,14 +97,13 @@ def parse_sanitized_address(line):
     if _COUNTRY_SUFFIX_RE.search(line):
         return None
     match = _US_ADDRESS_RE.match(line)
-    if not match:
-        return None
-    formatted = format_address(
-        match.group("street"),
-        match.group("city"),
-        match.group("state"),
-        match.group("zip"),
-    )
+    if match:
+        formatted = _format_parsed_address(match, include_zip=True)
+    else:
+        match = _US_ADDRESS_NO_ZIP_RE.match(line)
+        if not match:
+            return None
+        formatted = _format_parsed_address(match, include_zip=False)
     if line != formatted and line.lower() != formatted.lower():
         return None
     return formatted

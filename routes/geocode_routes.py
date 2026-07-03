@@ -35,7 +35,8 @@ def geocode():
         return jsonify({
             "error": (
                 "Each address must use the format: street address, city, ST ZIP "
-                "(example: 2249 Washington Ave, Bronx, NY 10456)."
+                "(ZIP optional; example: 2249 Washington Ave, Bronx, NY 10456 "
+                "or 1101 Forest Ave, Bronx, NY)."
             ),
             "invalid_addresses": invalid_addresses,
         }), 400

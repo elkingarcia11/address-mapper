@@ -46,6 +46,97 @@ function syncGoogleMapsGeoKeys(sourceId) {
   } else {
     plotInput.value = value;
   }
+
+  savePersistedSettings();
+}
+
+const PERSISTED_SETTINGS_KEY = "addressMapper.settings";
+
+function readPersistedSettings() {
+  try {
+    const raw = localStorage.getItem(PERSISTED_SETTINGS_KEY);
+    if (!raw) {
+      return null;
+    }
+    const data = JSON.parse(raw);
+    return typeof data === "object" && data ? data : null;
+  } catch (error) {
+    console.warn("Could not read saved settings:", error);
+    return null;
+  }
+}
+
+function collectPersistedSettings() {
+  return {
+    openaiApiKey: document.getElementById("openaiApiKey").value,
+    googleMapsGeoApiKey: getGoogleMapsGeoKey(),
+    googleMapsJsApiKey: document.getElementById("googleMapsJsApiKey").value,
+    orsApiKey: document.getElementById("orsApiKey").value,
+    optimizeStartInput: document.getElementById("optimizeStartInput").value,
+    optimizeEndInput: document.getElementById("optimizeEndInput").value,
+    optimizeEndSameAsStart: document.getElementById("optimizeEndSameAsStart").checked,
+  };
+}
+
+function savePersistedSettings() {
+  try {
+    localStorage.setItem(
+      PERSISTED_SETTINGS_KEY,
+      JSON.stringify(collectPersistedSettings())
+    );
+  } catch (error) {
+    console.warn("Could not save settings:", error);
+  }
+}
+
+function loadPersistedSettings() {
+  const data = readPersistedSettings();
+  if (!data) {
+    return;
+  }
+
+  if (typeof data.openaiApiKey === "string") {
+    document.getElementById("openaiApiKey").value = data.openaiApiKey;
+  }
+  if (typeof data.googleMapsGeoApiKey === "string") {
+    document.getElementById("googleMapsGeoApiKey").value = data.googleMapsGeoApiKey;
+    document.getElementById("googleMapsGeoApiKeyOptimize").value =
+      data.googleMapsGeoApiKey;
+  }
+  if (typeof data.googleMapsJsApiKey === "string") {
+    document.getElementById("googleMapsJsApiKey").value = data.googleMapsJsApiKey;
+  }
+  if (typeof data.orsApiKey === "string") {
+    document.getElementById("orsApiKey").value = data.orsApiKey;
+  }
+  if (typeof data.optimizeStartInput === "string") {
+    document.getElementById("optimizeStartInput").value = data.optimizeStartInput;
+  }
+  if (typeof data.optimizeEndSameAsStart === "boolean") {
+    document.getElementById("optimizeEndSameAsStart").checked =
+      data.optimizeEndSameAsStart;
+  }
+  if (typeof data.optimizeEndInput === "string") {
+    document.getElementById("optimizeEndInput").value = data.optimizeEndInput;
+  }
+}
+
+function bindPersistedSettings() {
+  [
+    "openaiApiKey",
+    "googleMapsGeoApiKey",
+    "googleMapsGeoApiKeyOptimize",
+    "googleMapsJsApiKey",
+    "orsApiKey",
+    "optimizeStartInput",
+    "optimizeEndInput",
+  ].forEach((inputId) => {
+    document.getElementById(inputId).addEventListener("input", savePersistedSettings);
+  });
+
+  document
+    .getElementById("optimizeEndSameAsStart")
+    .addEventListener("change", savePersistedSettings);
 }
 
 function validateApiKeys(requiredKeys = [], contextTab = null) {
@@ -288,11 +379,31 @@ async function optimizeRoute() {
     return;
   }
 
+  const startAddress = document.getElementById("optimizeStartInput").value.trim();
+  const endAddress = document.getElementById("optimizeEndInput").value.trim();
   const addressText = document.getElementById("optimizeInput").value;
-  const { valid: addresses, invalid } = validateSanitizedAddresses(addressText);
+  const { valid: stops, invalid } = validateSanitizedAddresses(addressText);
 
-  if (addresses.length < 2) {
-    alert("Enter at least two addresses: one start and one end.");
+  const endpointInvalid = [];
+  if (startAddress && !isSanitizedAddressLine(startAddress)) {
+    endpointInvalid.push(`Start: ${startAddress}`);
+  }
+  if (endAddress && !isSanitizedAddressLine(endAddress)) {
+    endpointInvalid.push(`End: ${endAddress}`);
+  }
+
+  if (!startAddress || !endAddress) {
+    alert("Enter both a start and end address.");
+    return;
+  }
+
+  if (endpointInvalid.length > 0) {
+    alert(formatSanitizedAddressError(endpointInvalid));
+    return;
+  }
+
+  if (stops.length === 0) {
+    alert("Enter at least one stop address.");
     return;
   }
 
@@ -301,7 +412,48 @@ async function optimizeRoute() {
     return;
   }
 
+  const routeCapacities = getRouteCapacities();
+  const totalStops = stops.length;
+  const capacitySum = routeCapacities.reduce((sum, value) => sum + value, 0);
+  const splitMode = getSplitMode();
+  const numRoutes = getNumRoutes();
+
+  if (splitMode === "manual") {
+    if (routeCapacities.length === 0) {
+      alert("Enter the number of routes and stops per route.");
+      return;
+    }
+
+    if (capacitySum !== totalStops) {
+      alert(
+        `Route capacities must sum to ${totalStops} stops ` +
+          `(currently ${capacitySum}). Adjust stops per route.`
+      );
+      return;
+    }
+  } else if (totalStops < numRoutes) {
+    alert(
+      `Need at least ${numRoutes} stops for ${numRoutes} routes ` +
+        `(currently ${totalStops}). Add more stop addresses or reduce routes.`
+    );
+    return;
+  }
+
   const apiKeys = getApiKeys();
+  const requestBody = {
+    start_address: startAddress,
+    end_address: endAddress,
+    stops,
+    google_maps_geo_api_key: apiKeys.googleMapsGeo,
+    ors_api_key: apiKeys.ors,
+    split_mode: splitMode,
+    num_routes: numRoutes,
+  };
+
+  if (splitMode === "manual") {
+    requestBody.route_capacities = routeCapacities;
+  }
+
   const spinnerContainer = document.getElementById("spinnerContainer");
 
   spinnerContainer.style.display = "flex";
@@ -313,11 +465,7 @@ async function optimizeRoute() {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
       },
-      body: JSON.stringify({
-        addresses,
-        google_maps_geo_api_key: apiKeys.googleMapsGeo,
-        ors_api_key: apiKeys.ors,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
@@ -335,20 +483,50 @@ async function optimizeRoute() {
       throw new Error(data.error || "Failed to optimize route");
     }
 
-    document.getElementById("optimizeOutput").value = data.ordered_addresses
-      .map((address, index) => `${index + 1}. ${address}`)
-      .join("\n");
+    const startLabel = data.start_label || data.depot_label;
+    const endLabel = data.end_label || data.depot_label;
+    const outputLines = [
+      `Start: ${startLabel}`,
+      `End: ${endLabel}`,
+      "",
+      `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
+    ];
+
+    if (data.split_mode === "balanced_distance") {
+      outputLines.push("Split mode: balanced by driving distance per route");
+    }
+
+    outputLines.push("");
+
+    data.routes.forEach((route) => {
+      outputLines.push(
+        `--- Route ${route.route_number} (${route.target_stops} stops, ${route.distance_miles} mi) ---`
+      );
+      outputLines.push(`Start: ${startLabel}`);
+      outputLines.push(`End: ${endLabel}`);
+      route.ordered_stop_labels.forEach((address, index) => {
+        outputLines.push(`${index + 1}. ${address}`);
+      });
+      outputLines.push("");
+    });
+
+    document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
     document.getElementById("optimizeDistance").textContent =
-      `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`;
+      `${data.routes.length} routes · ${data.total_distance_miles} miles total`;
 
     document.getElementById("resultsEmptyHint").classList.add("hidden");
     document.getElementById("optimizeDistance").classList.remove("hidden");
     document.getElementById("optimizeOutput").classList.remove("hidden");
     document.querySelector(".results-output-label").classList.remove("hidden");
 
+    const successMessage =
+      data.split_mode === "balanced_distance"
+        ? `${data.routes.length} routes optimized with balanced driving distance.`
+        : `${data.routes.length} routes optimized successfully.`;
+
     showResultBanner(
       "optimizeResultBanner",
-      "Route optimized successfully.",
+      successMessage,
       "results"
     );
   } catch (error) {
@@ -360,7 +538,7 @@ async function optimizeRoute() {
 }
 
 const SANITIZED_ADDRESS_RE =
-  /^.+,\s*[^,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?\s*$/i;
+  /^.+,\s*[^,]+,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\s*$/i;
 const LEADING_NUMBER_RE = /^\s*\d+[.)]\s*/;
 const APT_IN_ADDRESS_RE =
   /(?:,\s*(?:Apt|Apartment|Unit|Ste|Suite|Rm|Room)\.?\s*#?\s*[\w-]+|\s+(?:Apt|Apartment|Unit|Ste|Suite|Rm|Room)\.?\s*#?\s*[\w-]+|\s+#\s*[\w-]+)/i;
@@ -402,7 +580,8 @@ function formatSanitizedAddressError(invalidAddresses) {
       : "";
   return (
     "Each address must use the format: street address, city, ST ZIP\n" +
-    "Example: 2249 Washington Ave, Bronx, NY 10456\n\n" +
+    "ZIP is optional. Example: 2249 Washington Ave, Bronx, NY 10456\n" +
+    "Example without ZIP: 1101 Forest Ave, Bronx, NY\n\n" +
     "Fix these lines:\n" +
     preview +
     suffix
@@ -535,10 +714,182 @@ async function geocodeAddresses() {
   }
 }
 
+function countOptimizeStops() {
+  const addressText = document.getElementById("optimizeInput").value;
+  const { valid: stops } = validateSanitizedAddresses(addressText);
+  return stops.length;
+}
+
+function syncOptimizeEndFromStart() {
+  const endInput = document.getElementById("optimizeEndInput");
+  const sameAsStart = document.getElementById("optimizeEndSameAsStart").checked;
+  if (sameAsStart) {
+    endInput.value = document.getElementById("optimizeStartInput").value;
+    endInput.disabled = true;
+  } else {
+    endInput.disabled = false;
+  }
+  updateRouteCapacitySummary();
+  updateButtonStates();
+}
+
+function hasValidOptimizeEndpoints() {
+  const startAddress = document.getElementById("optimizeStartInput").value.trim();
+  const endAddress = document.getElementById("optimizeEndInput").value.trim();
+  return (
+    startAddress &&
+    endAddress &&
+    isSanitizedAddressLine(startAddress) &&
+    isSanitizedAddressLine(endAddress)
+  );
+}
+
+function getSplitMode() {
+  const splitModeInput = document.getElementById("splitMode");
+  return splitModeInput?.value === "balanced_distance"
+    ? "balanced_distance"
+    : "manual";
+}
+
+function getNumRoutes() {
+  const numRoutesInput = document.getElementById("numRoutes");
+  return Math.min(
+    50,
+    Math.max(1, parseInt(numRoutesInput?.value, 10) || 1)
+  );
+}
+
+function getRouteCapacities() {
+  const inputs = document.querySelectorAll("[data-route-capacity]");
+  return Array.from(inputs).map((input) => {
+    const value = parseInt(input.value, 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  });
+}
+
+function distributeStopsEvenly(totalStops, numRoutes) {
+  if (numRoutes <= 0 || totalStops <= 0) {
+    return Array.from({ length: Math.max(numRoutes, 0) }, () => 1);
+  }
+
+  const base = Math.floor(totalStops / numRoutes);
+  const remainder = totalStops % numRoutes;
+  return Array.from({ length: numRoutes }, (_, index) => {
+    return base + (index < remainder ? 1 : 0);
+  });
+}
+
+function renderRouteCapacityInputs() {
+  const numRoutesInput = document.getElementById("numRoutes");
+  const container = document.getElementById("routeCapacitiesContainer");
+  const splitMode = getSplitMode();
+  const numRoutes = getNumRoutes();
+  numRoutesInput.value = String(numRoutes);
+
+  if (splitMode === "balanced_distance") {
+    container.innerHTML = "";
+    updateRouteCapacitySummary();
+    return;
+  }
+
+  const existingValues = getRouteCapacities();
+  const totalStops = countOptimizeStops();
+  const existingSum = existingValues.reduce((sum, value) => sum + value, 0);
+  const defaultValues =
+    existingValues.length === numRoutes && existingSum === totalStops
+      ? existingValues
+      : distributeStopsEvenly(totalStops, numRoutes);
+
+  container.innerHTML = "";
+
+  for (let routeIndex = 0; routeIndex < numRoutes; routeIndex += 1) {
+    const field = document.createElement("div");
+    field.className = "field-group";
+
+    const label = document.createElement("label");
+    label.setAttribute("for", `routeCapacity${routeIndex + 1}`);
+    label.textContent = `Route ${routeIndex + 1} stops`;
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.id = `routeCapacity${routeIndex + 1}`;
+    input.dataset.routeCapacity = "true";
+    input.value = String(defaultValues[routeIndex] || 1);
+    input.addEventListener("input", () => {
+      updateRouteCapacitySummary();
+      updateButtonStates();
+    });
+
+    field.appendChild(label);
+    field.appendChild(input);
+    container.appendChild(field);
+  }
+
+  updateRouteCapacitySummary();
+}
+
+function updateRouteCapacitySummary() {
+  const summary = document.getElementById("routeCapacitySummary");
+  const totalStops = countOptimizeStops();
+  const routeCapacities = getRouteCapacities();
+  const capacitySum = routeCapacities.reduce((sum, value) => sum + value, 0);
+  const splitMode = getSplitMode();
+  const numRoutes = getNumRoutes();
+
+  summary.classList.remove(
+    "route-capacity-summary--match",
+    "route-capacity-summary--mismatch"
+  );
+
+  if (totalStops === 0) {
+    summary.textContent = "No stops listed yet.";
+    return;
+  }
+
+  if (!hasValidOptimizeEndpoints()) {
+    summary.textContent = `${totalStops} stop${totalStops === 1 ? "" : "s"} listed. Add valid start and end addresses.`;
+    return;
+  }
+
+  if (splitMode === "balanced_distance") {
+    if (totalStops < numRoutes) {
+      summary.textContent =
+        `${totalStops} stop${totalStops === 1 ? "" : "s"} for ${numRoutes} routes — ` +
+        "add more stops or reduce the number of routes.";
+      summary.classList.add("route-capacity-summary--mismatch");
+      return;
+    }
+
+    summary.textContent =
+      `${totalStops} stops across ${numRoutes} routes — ` +
+      "optimizer will split stops to balance driving distance.";
+    summary.classList.add("route-capacity-summary--match");
+    return;
+  }
+
+  if (routeCapacities.length === 0) {
+    summary.textContent = `${totalStops} stop${totalStops === 1 ? "" : "s"} to assign.`;
+    return;
+  }
+
+  if (capacitySum === totalStops) {
+    summary.textContent = `${capacitySum} of ${totalStops} stops assigned. Ready to optimize.`;
+    summary.classList.add("route-capacity-summary--match");
+    return;
+  }
+
+  summary.textContent = `${capacitySum} of ${totalStops} stops assigned. Adjust route stops to match.`;
+  summary.classList.add("route-capacity-summary--mismatch");
+}
+
 function updateButtonStates() {
   const blobInput = document.getElementById("blobInput");
   const addressInput = document.getElementById("addressInput");
   const optimizeInput = document.getElementById("optimizeInput");
+  const optimizeStartInput = document.getElementById("optimizeStartInput");
+  const optimizeEndInput = document.getElementById("optimizeEndInput");
+  const optimizeEndSameAsStart = document.getElementById("optimizeEndSameAsStart");
   const convertButton = document.getElementById("buttonSubmit");
   const plotButton = document.getElementById("addressSubmit");
   const optimizeButton = document.getElementById("optimizeSubmit");
@@ -554,9 +905,22 @@ function updateButtonStates() {
   plotButton.disabled = !addressHasContent;
   clearAddressButton.disabled = !addressHasContent;
 
-  const optimizeHasContent = optimizeInput.value.trim() !== "";
-  optimizeButton.disabled = !optimizeHasContent;
-  clearOptimizeButton.disabled = !optimizeHasContent;
+  const optimizeHasStops = optimizeInput.value.trim() !== "";
+  const totalStops = countOptimizeStops();
+  const splitMode = getSplitMode();
+  const numRoutes = getNumRoutes();
+  const capacitySum = getRouteCapacities().reduce((sum, value) => sum + value, 0);
+  const capacitiesMatch = totalStops > 0 && capacitySum === totalStops;
+  const balancedReady = totalStops >= numRoutes;
+  const optimizeReady =
+    splitMode === "balanced_distance" ? balancedReady : capacitiesMatch;
+  const endpointsReady = hasValidOptimizeEndpoints();
+  optimizeButton.disabled =
+    !optimizeHasStops || !endpointsReady || !optimizeReady;
+  clearOptimizeButton.disabled =
+    !optimizeHasStops &&
+    !optimizeStartInput.value.trim() &&
+    !optimizeEndInput.value.trim();
 }
 
 function clearBlobInput() {
@@ -599,6 +963,13 @@ async function copyConvertOutput() {
 
 function clearOptimizeInput() {
   document.getElementById("optimizeInput").value = "";
+  document.getElementById("optimizeStartInput").value = "";
+  document.getElementById("optimizeEndInput").value = "";
+  document.getElementById("optimizeEndSameAsStart").checked = true;
+  syncOptimizeEndFromStart();
+  document.getElementById("numRoutes").value = "2";
+  document.getElementById("splitMode").value = "manual";
+  renderRouteCapacityInputs();
   document.getElementById("optimizeOutput").value = "";
   document.getElementById("optimizeDistance").textContent = "";
   document.getElementById("optimizeDistance").classList.add("hidden");
@@ -607,6 +978,7 @@ function clearOptimizeInput() {
   document.getElementById("resultsEmptyHint").classList.remove("hidden");
   hideResultBanner("optimizeResultBanner");
   clearTabBadge("results");
+  savePersistedSettings();
   updateButtonStates();
 }
 
@@ -634,14 +1006,68 @@ function clearMap() {
   clearTabBadge("map");
 }
 
+function initPasswordVisibilityToggles() {
+  const eyeShowIcon = `
+    <svg class="password-toggle__icon password-toggle__icon--show" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>`;
+  const eyeHideIcon = `
+    <svg class="password-toggle__icon password-toggle__icon--hide" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 3l18 18"></path>
+      <path d="M10.58 10.58A3 3 0 0 0 12 15a3 3 0 0 0 2.42-4.42"></path>
+      <path d="M9.88 4.24A10.94 10.94 0 0 1 12 4c6.5 0 10 7 10 7a18.27 18.27 0 0 1-2.16 3.19"></path>
+      <path d="M6.61 6.61A18.48 18.48 0 0 0 2 12s3.5 7 10 7a10.66 10.66 0 0 0 5.39-1.43"></path>
+    </svg>`;
+
+  document.querySelectorAll(".field-group input[type='password']").forEach((input) => {
+    if (input.closest(".password-field")) {
+      return;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "password-field";
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+
+    const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "password-toggle";
+    toggleButton.setAttribute("aria-label", "Show API key");
+    toggleButton.setAttribute("aria-pressed", "false");
+    toggleButton.innerHTML = eyeShowIcon + eyeHideIcon;
+
+    toggleButton.addEventListener("click", () => {
+      const isVisible = input.type === "text";
+      input.type = isVisible ? "password" : "text";
+      toggleButton.setAttribute("aria-pressed", String(!isVisible));
+      toggleButton.setAttribute(
+        "aria-label",
+        isVisible ? "Show API key" : "Hide API key"
+      );
+    });
+
+    wrapper.appendChild(toggleButton);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   const addressInput = document.getElementById("addressInput");
   const blobInput = document.getElementById("blobInput");
   const optimizeInput = document.getElementById("optimizeInput");
+  const optimizeStartInput = document.getElementById("optimizeStartInput");
+  const optimizeEndInput = document.getElementById("optimizeEndInput");
+  const optimizeEndSameAsStart = document.getElementById("optimizeEndSameAsStart");
+  const numRoutesInput = document.getElementById("numRoutes");
+  const splitModeInput = document.getElementById("splitMode");
 
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   });
+
+  initPasswordVisibilityToggles();
+  loadPersistedSettings();
+  bindPersistedSettings();
 
   addressInput.addEventListener("input", updateButtonStates);
   addressInput.addEventListener("paste", () => setTimeout(updateButtonStates, 0));
@@ -649,8 +1075,45 @@ document.addEventListener("DOMContentLoaded", function () {
   blobInput.addEventListener("input", updateButtonStates);
   blobInput.addEventListener("paste", () => setTimeout(updateButtonStates, 0));
 
-  optimizeInput.addEventListener("input", updateButtonStates);
-  optimizeInput.addEventListener("paste", () => setTimeout(updateButtonStates, 0));
+  optimizeInput.addEventListener("input", () => {
+    renderRouteCapacityInputs();
+    updateButtonStates();
+  });
+  optimizeInput.addEventListener("paste", () => {
+    setTimeout(() => {
+      renderRouteCapacityInputs();
+      updateButtonStates();
+    }, 0);
+  });
+
+  optimizeStartInput.addEventListener("input", syncOptimizeEndFromStart);
+  optimizeStartInput.addEventListener("paste", () => {
+    setTimeout(syncOptimizeEndFromStart, 0);
+  });
+  optimizeEndInput.addEventListener("input", () => {
+    updateRouteCapacitySummary();
+    updateButtonStates();
+  });
+  optimizeEndInput.addEventListener("paste", () => {
+    setTimeout(() => {
+      updateRouteCapacitySummary();
+      updateButtonStates();
+    }, 0);
+  });
+  optimizeEndSameAsStart.addEventListener("change", syncOptimizeEndFromStart);
+
+  numRoutesInput.addEventListener("input", () => {
+    renderRouteCapacityInputs();
+    updateButtonStates();
+  });
+
+  splitModeInput.addEventListener("change", () => {
+    renderRouteCapacityInputs();
+    updateButtonStates();
+  });
+
+  renderRouteCapacityInputs();
+  syncOptimizeEndFromStart();
 
   document.getElementById("googleMapsGeoApiKey").addEventListener("input", () => {
     syncGoogleMapsGeoKeys("googleMapsGeoApiKey");
