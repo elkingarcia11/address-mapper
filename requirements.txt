@@ -4,3 +4,5 @@ flask-cors
 requests
 gunicorn
 google-cloud-storage
+ortools
+openrouteservice

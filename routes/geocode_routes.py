@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
-import requests
-from os import getenv
-from utils.geocode_utils import extract_street_address
+
+from utils.geocode_service import geocode_addresses
 
 # Create a blueprint for geocode routes
 geocode_bp = Blueprint('geocode', __name__)
@@ -28,33 +27,5 @@ def geocode():
     if not validate_google_maps_api_key(google_maps_geo_api_key):
         return jsonify({"error": "Invalid Google Maps API key format"}), 400
 
-    geocoded_results = []
-
-    for address in addresses:
-        response = requests.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": address, "key": google_maps_geo_api_key}
-        )
-        if response.status_code == 200:
-            result = response.json()
-            if result["status"] == "OK":
-                location = result["results"][0]["geometry"]["location"]
-                street_address = extract_street_address(result["results"][0])
-                geocoded_results.append({
-                    "address": address,
-                    "latitude": location["lat"],
-                    "longitude": location["lng"],
-                    "street_address": street_address
-                })
-            else:
-                geocoded_results.append({
-                    "address": address,
-                    "error": f"Geocoding failed: {result['status']}"
-                })
-        else:
-            geocoded_results.append({
-                "address": address,
-                "error": f"Geocoding failed: {response.status_code} - {response.text}"
-            })
-
+    geocoded_results = geocode_addresses(addresses, google_maps_geo_api_key)
     return jsonify({"results": geocoded_results})

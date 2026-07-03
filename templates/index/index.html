@@ -9,7 +9,7 @@
       rel="icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
       type="image/x-icon"
-    />  
+    />
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='styles.css') }}"
@@ -21,78 +21,180 @@
   </head>
 
   <body>
-    <!-- Loading spinner container - moved here to be global -->
     <div id="spinnerContainer" class="spinner-container">
       <div class="spinner"></div>
     </div>
 
-    <div class="container">
-      <!-- API Keys Section -->
-      <button
-        id="apiHeader"
-        onclick="toggleSection('apiSection')"
-        role="button"
-      >
-        API Configuration:
-        <span id="apiSectionIndicator" class="chevron">▼</span>
-      </button>
-      <section id="apiSection" class="hidden">
-        <div class="api-keys-container">
-          <div class="api-key-group">
-            <label for="googleMapsGeoApiKey">Google Maps Geocoding API Key:</label>
-            <input type="password" id="googleMapsGeoApiKey" placeholder="Enter your Google Maps Geocoding API key" />
-          </div>
-          <div class="api-key-group">
-            <label for="googleMapsJsApiKey">Google Maps JavaScript API Key:</label>
-            <input type="password" id="googleMapsJsApiKey" placeholder="Enter your Google Maps JavaScript API key" />
-          </div>
-          <div class="api-key-group">
-            <label for="openaiApiKey">OpenAI API Key:</label>
-            <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" />
-          </div>
-        </div>
-      </section>
+    <div class="app-shell">
+      <header class="app-header">
+        <h1>Address Mapper</h1>
+        <p class="app-subtitle">Extract, plot, and optimize address routes</p>
+      </header>
 
-      <!-- Blob Section -->
-      <button
-        id="blobHeader"
-        onclick="toggleSection('blobSection')"
-        role="button"
-      >
-        Convert Blob to Addresses:
-        <span id="blobSectionIndicator" class="chevron">▼</span>
-      </button>
-      <section id="blobSection" class="hidden">
-        <textarea id="blobInput" rows="10" cols="50"></textarea>
-        <br />
-        <div class="button-group">
-          <button id="buttonSubmit" onclick="extractAddresses()">Convert</button>
-          <button id="clearBlobButton" onclick="clearBlobInput()" class="clear-button">Clear Input</button>
-        </div>
-      </section>
+      <div class="workspace">
+        <nav class="tab-bar" role="tablist" aria-label="Main navigation">
+          <button class="tab active" data-tab="convert" role="tab" aria-selected="true">Convert Blob to Addresses</button>
+          <button class="tab" data-tab="plot" role="tab" aria-selected="false">
+            Plot Addresses on Map
+            <span id="plotTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
+          </button>
+          <button class="tab" data-tab="map" role="tab" aria-selected="false">
+            Map View
+            <span id="mapTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
+          </button>
+          <button class="tab" data-tab="optimize" role="tab" aria-selected="false">Optimize Route</button>
+          <button class="tab" data-tab="results" role="tab" aria-selected="false">
+            Optimized Route Results
+            <span id="resultsTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
+          </button>
+        </nav>
 
-      <!-- Address Section -->
-      <button id="addressHeader" onclick="toggleSection('addressSection')">
-        Plot Addresses on Map:
-        <span id="addressSectionIndicator" class="chevron">▼</span>
-      </button>
+        <div class="tab-panels">
+          <!-- Convert -->
+          <section id="tab-convert" class="tab-panel active" role="tabpanel">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h2>Convert Blob to Addresses</h2>
+                <p class="panel-hint">Paste unstructured text and extract a list of addresses.</p>
+              </div>
 
-      <section id="addressSection" class="hidden">
-        <p>Desired Format: <i>2249 Washington Ave, Bronx, NY 10456</i></p>
-        <textarea id="addressInput" rows="10" cols="50"></textarea>
-        <br />
-        <div class="button-group">
-          <button id="addressSubmit" onclick="geocodeAddresses()">Plot</button>
-          <button id="clearAddressButton" onclick="clearAddressInput()" class="clear-button">Clear Input</button>
+              <div class="panel-section api-section">
+                <h3 class="section-label">API Configuration</h3>
+                <div class="field-group">
+                  <label for="openaiApiKey">OpenAI API Key</label>
+                  <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" />
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <label class="section-label" for="blobInput">Input Text</label>
+                <textarea id="blobInput" rows="10" placeholder="Paste your text here..."></textarea>
+              </div>
+
+              <div class="panel-actions">
+                <button id="buttonSubmit" class="btn btn-primary" onclick="extractAddresses()">Convert</button>
+                <button id="clearBlobButton" class="btn btn-secondary" onclick="clearBlobInput()">Clear Input</button>
+              </div>
+
+              <div id="convertOutputSection" class="panel-section output-section hidden">
+                <div class="output-header">
+                  <div>
+                    <label class="section-label" for="convertOutput">Extracted Addresses</label>
+                    <p id="convertOutputMeta" class="output-meta"></p>
+                  </div>
+                  <button id="copyConvertOutput" type="button" class="btn btn-copy btn-sm" onclick="copyConvertOutput()">Copy</button>
+                </div>
+                <textarea id="convertOutput" rows="10" readonly class="results-output" aria-readonly="true" tabindex="0"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- Plot -->
+          <section id="tab-plot" class="tab-panel" role="tabpanel">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h2>Plot Addresses on Map</h2>
+                <p class="panel-hint">One address per line. Format: <em>2249 Washington Ave, Bronx, NY 10456</em></p>
+              </div>
+
+              <div class="panel-section api-section">
+                <h3 class="section-label">API Configuration</h3>
+                <div class="field-grid">
+                  <div class="field-group">
+                    <label for="googleMapsGeoApiKey">Google Maps Geocoding API Key</label>
+                    <input type="password" id="googleMapsGeoApiKey" placeholder="Enter your Geocoding API key" />
+                  </div>
+                  <div class="field-group">
+                    <label for="googleMapsJsApiKey">Google Maps JavaScript API Key</label>
+                    <input type="password" id="googleMapsJsApiKey" placeholder="Enter your JavaScript API key" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div id="plotResultBanner" class="result-banner hidden"></div>
+                <label class="section-label" for="addressInput">Addresses</label>
+                <textarea id="addressInput" rows="10" placeholder="Enter one address per line..."></textarea>
+              </div>
+
+              <div class="panel-actions">
+                <button id="addressSubmit" class="btn btn-primary" onclick="geocodeAddresses()">Plot</button>
+                <button id="clearAddressButton" class="btn btn-secondary" onclick="clearAddressInput()">Clear Input</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Map -->
+          <section id="tab-map" class="tab-panel" role="tabpanel">
+            <div class="panel-card">
+              <div class="panel-header panel-header--row">
+                <div>
+                  <h2>Map View</h2>
+                  <p id="mapEmptyHint" class="panel-hint">Plot addresses from the Plot Addresses on Map tab to see them here.</p>
+                </div>
+                <button id="clearMapButton" class="btn btn-danger btn-sm hidden" onclick="clearMap()">Clear Map</button>
+              </div>
+
+              <div class="panel-section panel-section--flush">
+                <div id="map"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Optimize -->
+          <section id="tab-optimize" class="tab-panel" role="tabpanel">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h2>Optimize Route</h2>
+                <p class="panel-hint">One address per line. The <strong>first</strong> is the start, the <strong>last</strong> is the end; middle stops are reordered to minimize driving distance.</p>
+              </div>
+
+              <div class="panel-section api-section">
+                <h3 class="section-label">API Configuration</h3>
+                <div class="field-grid">
+                  <div class="field-group">
+                    <label for="googleMapsGeoApiKeyOptimize">Google Maps Geocoding API Key</label>
+                    <input type="password" id="googleMapsGeoApiKeyOptimize" placeholder="Enter your Geocoding API key" />
+                  </div>
+                  <div class="field-group">
+                    <label for="orsApiKey">OpenRouteService API Key</label>
+                    <input type="password" id="orsApiKey" placeholder="Enter your OpenRouteService API key" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel-section">
+                <div id="optimizeResultBanner" class="result-banner hidden"></div>
+                <label class="section-label" for="optimizeInput">Addresses</label>
+                <textarea id="optimizeInput" rows="10" placeholder="Enter one address per line..."></textarea>
+              </div>
+
+              <div class="panel-actions">
+                <button id="optimizeSubmit" class="btn btn-primary" onclick="optimizeRoute()">Optimize</button>
+                <button id="clearOptimizeButton" class="btn btn-secondary" onclick="clearOptimizeInput()">Clear Input</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Results -->
+          <section id="tab-results" class="tab-panel" role="tabpanel">
+            <div class="panel-card">
+              <div class="panel-header">
+                <h2>Optimized Route Results</h2>
+                <p id="resultsEmptyHint" class="panel-hint">Run route optimization from the Optimize Route tab to see results here.</p>
+              </div>
+
+              <div class="panel-section">
+                <p id="optimizeDistance" class="results-distance hidden"></p>
+                <label class="section-label results-output-label hidden" for="optimizeOutput">Optimized Order</label>
+                <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
-    <!-- Map Section -->
-    <div id="map"></div>
-    <!-- Clear Map Button -->
-    <div id="clearMapContainer" style="display: none;">
-      <button id="clearMapButton" onclick="clearMap()" class="clear-button">Clear Map</button>
-    </div>
+
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>
 </html>

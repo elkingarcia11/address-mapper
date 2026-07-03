@@ -40,13 +40,12 @@ The application has been designed with security in mind for handling user-provid
    python app.py
    ```
 4. Open `http://127.0.0.1:5001/` in your browser.
-5. Enter your API keys in the "API Configuration" section:
-   - **Google Maps Geocoding API Key**: For converting addresses to coordinates
-   - **Google Maps JavaScript API Key**: For displaying the interactive map
-   - **OpenAI API Key**: For extracting addresses from text
-6. Click "Load Map" to initialize Google Maps with your JavaScript API key.
-7. Paste a block of text into the input field and click "Convert" to extract addresses using OpenAI.
-8. Click "Plot" to visualize the extracted addresses on the map using Google Maps geocoding.
+5. Enter the API keys on the tab where you need them:
+   - **Convert Blob to Addresses**: OpenAI API key
+   - **Plot Addresses on Map**: Google Maps Geocoding and JavaScript API keys
+   - **Optimize Route**: Google Maps Geocoding and OpenRouteService API keys
+6. Paste a block of text into the Convert tab and click "Convert" to extract addresses using OpenAI.
+7. Click "Plot" on the Plot Addresses on Map tab to visualize the extracted addresses using Google Maps geocoding.
 
 ## Docker Testing Locally
 

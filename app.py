@@ -1,6 +1,7 @@
 from routes.geocode_routes import geocode_bp
 from routes.extract_routes import extract_bp
 from routes.index_routes import index_bp
+from routes.optimize_routes import optimize_bp
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -31,6 +32,7 @@ def after_request(response):
 app.register_blueprint(index_bp)
 app.register_blueprint(extract_bp)
 app.register_blueprint(geocode_bp)
+app.register_blueprint(optimize_bp)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5001)
