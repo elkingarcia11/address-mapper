@@ -437,12 +437,12 @@ body {
 .panel-actions--end {
   margin-top: auto;
   padding-top: var(--space-md);
-  justify-content: flex-start;
+  width: 100%;
 }
 
 .panel-actions--end .btn {
-  flex: 0 0 auto;
-  min-width: 132px;
+  flex: 1;
+  min-width: 0;
 }
 
 .field-group {
@@ -768,6 +768,73 @@ textarea::placeholder {
   background: rgba(15, 23, 42, 0.55);
   justify-content: center;
   align-items: center;
+  pointer-events: all;
+}
+
+.app-progress {
+  position: fixed;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  z-index: 1001;
+  width: min(360px, calc(100vw - 2 * var(--space-md)));
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.app-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.app-progress__header strong {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.app-progress__header span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-progress__message {
+  margin: 0 0 var(--space-sm);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.app-progress__track {
+  height: 8px;
+  margin-bottom: var(--space-sm);
+  background: var(--surface-muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.app-progress__bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #38bdf8);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.app-progress__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.btn.is-loading {
+  position: relative;
 }
 
 .spinner {
@@ -834,5 +901,11 @@ textarea::placeholder {
 
   #map {
     min-height: 200px;
+  }
+
+  .app-progress {
+    left: var(--space-sm);
+    right: var(--space-sm);
+    width: auto;
   }
 }

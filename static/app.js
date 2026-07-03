@@ -4,6 +4,105 @@ let mapInitialized = false;
 let googleMapsLoaded = false;
 let markers = [];
 let activeTab = "convert";
+let progressIntervalId = null;
+let progressContext = null;
+
+function formatElapsedDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function estimateOptimizeSeconds(stopCount, routeCount) {
+  return Math.min(300, Math.max(30, 15 + stopCount + routeCount * 10));
+}
+
+function showProgress({ title, message, estimateSeconds = 30, steps = [] }) {
+  hideProgress(false);
+
+  const panel = document.getElementById("appProgress");
+  const titleEl = document.getElementById("appProgressTitle");
+  const messageEl = document.getElementById("appProgressMessage");
+  const elapsedEl = document.getElementById("appProgressElapsed");
+  const barEl = document.getElementById("appProgressBar");
+
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  elapsedEl.textContent = "0s";
+  barEl.style.width = "0%";
+  panel.classList.remove("hidden");
+
+  progressContext = {
+    estimateSeconds,
+    steps,
+    stepIndex: 0,
+    startedAt: Date.now(),
+  };
+
+  progressIntervalId = window.setInterval(() => {
+    if (!progressContext) {
+      return;
+    }
+
+    const elapsed = Date.now() - progressContext.startedAt;
+    elapsedEl.textContent = formatElapsedDuration(elapsed);
+
+    const ratio = Math.min(
+      0.95,
+      elapsed / (progressContext.estimateSeconds * 1000)
+    );
+    barEl.style.width = `${Math.round(ratio * 100)}%`;
+
+    if (progressContext.steps.length > 0) {
+      const stepDuration =
+        (progressContext.estimateSeconds * 1000) / progressContext.steps.length;
+      const nextIndex = Math.min(
+        progressContext.steps.length - 1,
+        Math.floor(elapsed / stepDuration)
+      );
+      if (nextIndex !== progressContext.stepIndex) {
+        progressContext.stepIndex = nextIndex;
+        messageEl.textContent = progressContext.steps[nextIndex];
+      }
+    }
+  }, 250);
+}
+
+function updateProgressMessage(message) {
+  document.getElementById("appProgressMessage").textContent = message;
+}
+
+function completeProgress(message) {
+  document.getElementById("appProgressBar").style.width = "100%";
+  if (message) {
+    updateProgressMessage(message);
+  }
+}
+
+function hideProgress(resetBar = true) {
+  if (progressIntervalId !== null) {
+    window.clearInterval(progressIntervalId);
+    progressIntervalId = null;
+  }
+  progressContext = null;
+  document.getElementById("appProgress").classList.add("hidden");
+  if (resetBar) {
+    document.getElementById("appProgressBar").style.width = "0%";
+  }
+}
+
+function setButtonLoading(buttonId, isLoading) {
+  const button = document.getElementById(buttonId);
+  if (!button) {
+    return;
+  }
+  button.disabled = isLoading;
+  button.classList.toggle("is-loading", isLoading);
+}
 
 const TAB_LABELS = {
   convert: "Convert Blob to Addresses",
@@ -331,9 +430,14 @@ async function extractAddresses() {
 
   const text = document.getElementById("blobInput").value;
   const apiKeys = getApiKeys();
-  const spinnerContainer = document.getElementById("spinnerContainer");
 
-  spinnerContainer.style.display = "flex";
+  showProgress({
+    title: "Converting addresses",
+    message: "Extracting addresses from text...",
+    estimateSeconds: 20,
+    steps: ["Extracting addresses from text...", "Formatting results..."],
+  });
+  setButtonLoading("buttonSubmit", true);
 
   try {
     const response = await fetch("/extract-addresses", {
@@ -366,11 +470,13 @@ async function extractAddresses() {
 
     setTabBadge("plot");
     updateButtonStates();
+    completeProgress("Addresses extracted.");
   } catch (error) {
     console.error("Failed to extract addresses:", error);
     alert(`Error: ${error.message}`);
   } finally {
-    spinnerContainer.style.display = "none";
+    hideProgress();
+    setButtonLoading("buttonSubmit", false);
   }
 }
 
@@ -454,9 +560,19 @@ async function optimizeRoute() {
     requestBody.route_capacities = routeCapacities;
   }
 
-  const spinnerContainer = document.getElementById("spinnerContainer");
-
-  spinnerContainer.style.display = "flex";
+  const estimateSeconds = estimateOptimizeSeconds(totalStops, numRoutes);
+  showProgress({
+    title: "Optimizing routes",
+    message: "Geocoding addresses...",
+    estimateSeconds,
+    steps: [
+      "Geocoding addresses...",
+      "Building driving distance matrix...",
+      "Assigning stops to routes...",
+      "Finalizing route order...",
+    ],
+  });
+  setButtonLoading("optimizeSubmit", true);
 
   try {
     const response = await fetch("/optimize-route", {
@@ -529,11 +645,14 @@ async function optimizeRoute() {
       successMessage,
       "results"
     );
+    completeProgress("Routes optimized.");
   } catch (error) {
     console.error("Failed to optimize route:", error);
     alert(`Error: ${error.message}`);
   } finally {
-    spinnerContainer.style.display = "none";
+    hideProgress();
+    setButtonLoading("optimizeSubmit", false);
+    updateButtonStates();
   }
 }
 
@@ -607,15 +726,25 @@ async function geocodeAddresses() {
   }
 
   const apiKeys = getApiKeys();
-  const spinnerContainer = document.getElementById("spinnerContainer");
   const mapElement = document.getElementById("map");
+  const spinnerContainer = document.getElementById("spinnerContainer");
 
-  spinnerContainer.style.display = "flex";
+  showProgress({
+    title: "Plotting addresses",
+    message: "Preparing map...",
+    estimateSeconds: Math.max(20, addresses.length * 2),
+    steps: ["Preparing map...", "Geocoding addresses...", "Adding markers..."],
+  });
+  setButtonLoading("addressSubmit", true);
 
   try {
     if (!map) {
+      spinnerContainer.style.display = "flex";
       await loadGoogleMapsIfNeeded();
+      spinnerContainer.style.display = "none";
     }
+
+    updateProgressMessage("Geocoding addresses...");
 
     const response = await fetch("/geocode", {
       method: "POST",
@@ -637,6 +766,7 @@ async function geocodeAddresses() {
       throw new Error(errorData.error || "Failed to geocode addresses");
     }
 
+    updateProgressMessage("Adding markers...");
     const data = await response.json();
     const results = data.results;
 
@@ -700,17 +830,14 @@ async function geocodeAddresses() {
       }
     }
 
-    if (mapInitialized) {
-      spinnerContainer.style.display = "none";
-    } else {
-      google.maps.event.addListenerOnce(map, "idle", () => {
-        spinnerContainer.style.display = "none";
-      });
-    }
+    completeProgress("Addresses plotted on map.");
   } catch (error) {
     console.error("Failed to geocode addresses:", error);
     alert(`Error: ${error.message}`);
+  } finally {
     spinnerContainer.style.display = "none";
+    hideProgress();
+    setButtonLoading("addressSubmit", false);
   }
 }
 

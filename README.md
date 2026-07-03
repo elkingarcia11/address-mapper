@@ -17,6 +17,7 @@ The interface is organized as a full-screen tabbed workflow. Each tab handles on
 - **Input validation** — Plot and Optimize reject malformed addresses and list lines that need fixing.
 - **Per-tab API keys** — Enter only the keys needed for the tab you are using. Keys can be shown/hidden with the eye toggle.
 - **Browser-side settings cache** — API keys and optimize start/end fields are saved in `localStorage` so you do not have to re-enter them on every visit.
+- **Non-blocking progress panel** — Long-running Convert, Plot, and Optimize jobs show a bottom-right progress card with elapsed time and step updates instead of freezing the page.
 - **Tab badges** — Visual indicators when a tab has new results waiting (Plot, Map View, Optimized Route Results).
 - **Copy extracted addresses** — Copy the clean address list directly from the Convert tab.
 
@@ -120,7 +121,7 @@ Saved API keys and optimize start/end values reload automatically from browser `
 4. Choose how stops are assigned:
    - **Specify stops per route** — Set the number of routes and how many stops each route should get.
    - **Balance routes by distance** — Set only the number of routes; the optimizer splits stops to keep driving distance per route roughly even.
-5. Click **Optimize**.
+5. Click **Optimize**. A progress card appears in the bottom-right with status updates; large jobs (dozens of stops) may take a few minutes.
 6. Results appear on the **Optimized Route Results** tab, including:
    - Start and end for each route
    - Numbered stop order per route
@@ -141,6 +142,8 @@ Saved API keys and optimize start/end values reload automatically from browser `
 ```
 
 For balanced splitting, send `"split_mode": "balanced_distance"` and `"num_routes": 3` instead of `route_capacities`.
+
+Solver time scales with stop count (for example, ~90 stops may take around 2–3 minutes). You can override this with `"time_limit_seconds"` in the request body.
 
 ## Docker Testing Locally
 
@@ -209,6 +212,7 @@ This application uses OpenAI's GPT model to extract addresses from blocks of tex
 - Make sure to use HTTPS in production environments for maximum security.
 - Multi-route optimization requires at least one stop plus valid start and end addresses. Balanced mode requires at least as many stops as routes.
 - Multi-route optimization currently requires the same start and end address for every route.
+- Large optimize jobs show a non-blocking progress panel; the page stays usable while the server geocodes, builds the distance matrix, and runs OR-Tools.
 - Map markers and optimized route results use the sanitized address format, not raw pasted text.
 - Invalid addresses on the Plot or Optimize tabs are rejected with a list of lines that need fixing.
 

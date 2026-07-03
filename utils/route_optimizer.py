@@ -128,6 +128,62 @@ def build_distance_matrix_ors(
     return matrix
 
 
+def compute_vrp_time_limit(
+    num_stops: int,
+    num_routes: int,
+    *,
+    minimum: int = 30,
+    maximum: int = 300,
+) -> int:
+    """Scale solver time with problem size for multi-stop VRP."""
+    return min(maximum, max(minimum, 15 + num_stops + num_routes * 10))
+
+
+def _max_route_distance_cap(
+    distance_matrix: list[list[int]],
+    max_stops_on_route: int,
+) -> int:
+    max_leg = max(
+        distance_matrix[i][j]
+        for i in range(len(distance_matrix))
+        for j in range(len(distance_matrix))
+        if i != j
+    )
+    return max_leg * (max_stops_on_route + 2)
+
+
+def _solve_routing_model(
+    routing: pywrapcp.RoutingModel,
+    *,
+    time_limit_seconds: int,
+):
+    strategies = (
+        routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC,
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC,
+        routing_enums_pb2.FirstSolutionStrategy.SAVINGS,
+        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION,
+    )
+    remaining = max(10, time_limit_seconds)
+
+    for index, strategy in enumerate(strategies):
+        attempts_left = len(strategies) - index
+        attempt_seconds = max(10, remaining // attempts_left)
+        remaining -= attempt_seconds
+
+        search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+        search_parameters.first_solution_strategy = strategy
+        search_parameters.local_search_metaheuristic = (
+            routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
+        )
+        search_parameters.time_limit.FromSeconds(attempt_seconds)
+
+        solution = routing.SolveWithParameters(search_parameters)
+        if solution is not None:
+            return solution
+
+    return None
+
+
 def optimize_route(
     start: Location,
     stops: Sequence[Location],
@@ -296,20 +352,14 @@ def optimize_multi_route(
 
     stops_dimension = routing.GetDimensionOrDie("StopsDimension")
     for vehicle_id, target_stops in enumerate(route_capacities):
-        routing.Solver().Add(
+        routing.solver().Add(
             stops_dimension.CumulVar(routing.End(vehicle_id)) == target_stops
         )
 
-    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+    solution = _solve_routing_model(
+        routing,
+        time_limit_seconds=time_limit_seconds,
     )
-    search_parameters.local_search_metaheuristic = (
-        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    )
-    search_parameters.time_limit.FromSeconds(time_limit_seconds)
-
-    solution = routing.SolveWithParameters(search_parameters)
     if solution is None:
         raise RuntimeError(
             "No solution found. Check that route capacities sum to the total "
@@ -412,11 +462,7 @@ def optimize_balanced_multi_route(
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
-    max_route_distance = sum(
-        distance_matrix[i][j]
-        for i in range(len(locations))
-        for j in range(len(locations))
-    )
+    max_route_distance = _max_route_distance_cap(distance_matrix, len(stops))
     routing.AddDimension(
         transit_callback_index,
         0,
@@ -441,24 +487,18 @@ def optimize_balanced_multi_route(
     )
     stops_dimension = routing.GetDimensionOrDie("StopsDimension")
     for vehicle_id in range(num_routes):
-        routing.Solver().Add(
+        routing.solver().Add(
             stops_dimension.CumulVar(routing.End(vehicle_id)) >= 1
         )
 
-    search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = (
-        routing_enums_pb2.FirstSolutionStrategy.PARALLEL_CHEAPEST_INSERTION
+    solution = _solve_routing_model(
+        routing,
+        time_limit_seconds=time_limit_seconds,
     )
-    search_parameters.local_search_metaheuristic = (
-        routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    )
-    search_parameters.time_limit.FromSeconds(time_limit_seconds)
-
-    solution = routing.SolveWithParameters(search_parameters)
     if solution is None:
         raise RuntimeError(
-            "No solution found. Check that all coordinates are reachable and "
-            "that the number of routes does not exceed the number of stops."
+            "No solution found for the current stops and route count. "
+            "Verify all addresses geocoded correctly and are reachable by car."
         )
 
     routes: list[dict] = []

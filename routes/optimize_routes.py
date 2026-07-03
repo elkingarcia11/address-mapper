@@ -5,6 +5,7 @@ from utils.address_format import validate_sanitized_address_lines
 from utils.geocode_service import geocode_addresses
 from utils.route_optimizer import (
     Location,
+    compute_vrp_time_limit,
     optimize_balanced_multi_route,
     optimize_multi_route,
     optimize_route,
@@ -106,8 +107,13 @@ def optimize_route_endpoint():
 
     balanced_mode = split_mode == "balanced_distance"
     multi_route = balanced_mode or route_capacities is not None
+    user_time_limit = data.get("time_limit_seconds")
     default_time_limit = 30 if multi_route else 5
-    time_limit_seconds = int(data.get("time_limit_seconds", default_time_limit))
+    time_limit_seconds = (
+        int(user_time_limit)
+        if user_time_limit is not None
+        else default_time_limit
+    )
 
     start_address, end_address, stop_lines = _resolve_optimize_inputs(data)
 
@@ -201,13 +207,19 @@ def optimize_route_endpoint():
                         "num_routes": parsed_num_routes,
                     }), 400
 
+                effective_time_limit = (
+                    time_limit_seconds
+                    if user_time_limit is not None
+                    else compute_vrp_time_limit(len(stops), parsed_num_routes)
+                )
+
                 result = optimize_balanced_multi_route(
                     depot,
                     stops,
                     parsed_num_routes,
                     api_key=ors_api_key,
                     profile=profile,
-                    time_limit_seconds=time_limit_seconds,
+                    time_limit_seconds=effective_time_limit,
                 )
             else:
                 parsed_capacities = _parse_route_capacities(route_capacities)
@@ -222,13 +234,19 @@ def optimize_route_endpoint():
                         "route_capacities": parsed_capacities,
                     }), 400
 
+                effective_time_limit = (
+                    time_limit_seconds
+                    if user_time_limit is not None
+                    else compute_vrp_time_limit(len(stops), len(parsed_capacities))
+                )
+
                 result = optimize_multi_route(
                     depot,
                     stops,
                     parsed_capacities,
                     api_key=ors_api_key,
                     profile=profile,
-                    time_limit_seconds=time_limit_seconds,
+                    time_limit_seconds=effective_time_limit,
                 )
         else:
             result = optimize_route(

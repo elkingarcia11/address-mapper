@@ -21,6 +21,18 @@
       <div class="spinner"></div>
     </div>
 
+    <div id="appProgress" class="app-progress hidden" role="status" aria-live="polite" aria-atomic="true">
+      <div class="app-progress__header">
+        <strong id="appProgressTitle">Working...</strong>
+        <span id="appProgressElapsed">0s</span>
+      </div>
+      <p id="appProgressMessage" class="app-progress__message">Starting...</p>
+      <div class="app-progress__track" aria-hidden="true">
+        <div id="appProgressBar" class="app-progress__bar"></div>
+      </div>
+      <p class="app-progress__hint">You can keep using the app while this runs.</p>
+    </div>
+
     <div class="app-shell">
       <header class="app-header">
         <h1>Address Mapper</h1>
