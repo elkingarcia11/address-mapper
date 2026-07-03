@@ -4,7 +4,16 @@ from routes.geocode_routes import validate_google_maps_api_key
 from utils.geocode_service import geocode_addresses
 from utils.route_optimizer import Location, optimize_route
 
+try:
+    from openrouteservice.exceptions import ApiError as OrsApiError
+except ImportError:
+    OrsApiError = None
+
 optimize_bp = Blueprint("optimize", __name__)
+
+
+def _normalize_api_key(value: str) -> str:
+    return value.strip().strip("'\"")
 
 
 def _to_location(geocoded):
@@ -22,8 +31,10 @@ def _to_location(geocoded):
 def optimize_route_endpoint():
     data = request.json or {}
     raw_addresses = data.get("addresses", [])
-    google_maps_geo_api_key = data.get("google_maps_geo_api_key", "").strip()
-    ors_api_key = data.get("ors_api_key", "").strip()
+    google_maps_geo_api_key = _normalize_api_key(
+        data.get("google_maps_geo_api_key", "")
+    )
+    ors_api_key = _normalize_api_key(data.get("ors_api_key", ""))
     profile = data.get("profile", "driving-car")
     time_limit_seconds = int(data.get("time_limit_seconds", 5))
 
@@ -64,6 +75,24 @@ def optimize_route_endpoint():
             time_limit_seconds=time_limit_seconds,
         )
     except Exception as exc:
+        if OrsApiError is not None and isinstance(exc, OrsApiError):
+            return jsonify({
+                "error": (
+                    "OpenRouteService denied the request. Verify your API key is "
+                    "valid, includes Matrix API access, and that your daily quota "
+                    "has not been exceeded."
+                ),
+                "details": str(exc),
+            }), 403
+        if "403" in str(exc) and "disallowed" in str(exc).lower():
+            return jsonify({
+                "error": (
+                    "OpenRouteService denied the request. Verify your API key is "
+                    "valid, includes Matrix API access, and that your daily quota "
+                    "has not been exceeded."
+                ),
+                "details": str(exc),
+            }), 403
         return jsonify({"error": str(exc)}), 500
 
     ordered_indices = result["ordered_indices"]

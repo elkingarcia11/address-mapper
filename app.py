@@ -25,7 +25,14 @@ def after_request(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self' https://maps.googleapis.com https://api.openai.com; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://maps.gstatic.com https://maps.googleapis.com; connect-src 'self' https://maps.googleapis.com https://api.openai.com"
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self' https://maps.googleapis.com https://api.openai.com; "
+        "script-src 'self' 'unsafe-inline' https://maps.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com https://maps.gstatic.com; "
+        "img-src 'self' data: https://maps.gstatic.com https://maps.googleapis.com; "
+        "connect-src 'self' https://maps.googleapis.com https://api.openai.com"
+    )
     return response
 
 # Import and register routes
