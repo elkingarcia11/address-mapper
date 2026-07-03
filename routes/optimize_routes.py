@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from routes.geocode_routes import validate_google_maps_api_key
+from utils.address_format import validate_sanitized_address_lines
 from utils.geocode_service import geocode_addresses
 from utils.route_optimizer import Location, optimize_route
 
@@ -44,6 +45,16 @@ def optimize_route_endpoint():
             "error": "At least two addresses are required (start and end)."
         }), 400
 
+    valid_addresses, invalid_addresses = validate_sanitized_address_lines(addresses)
+    if invalid_addresses:
+        return jsonify({
+            "error": (
+                "Each address must use the format: street address, city, ST ZIP "
+                "(example: 2249 Washington Ave, Bronx, NY 10456)."
+            ),
+            "invalid_addresses": invalid_addresses,
+        }), 400
+
     if not google_maps_geo_api_key:
         return jsonify({"error": "Google Maps Geo API key is required"}), 400
 
@@ -53,7 +64,7 @@ def optimize_route_endpoint():
     if not ors_api_key:
         return jsonify({"error": "OpenRouteService API key is required"}), 400
 
-    geocoded = geocode_addresses(addresses, google_maps_geo_api_key)
+    geocoded = geocode_addresses(valid_addresses, google_maps_geo_api_key)
     failed = [item for item in geocoded if item.get("error")]
     if failed:
         return jsonify({
@@ -61,9 +72,10 @@ def optimize_route_endpoint():
             "geocoding_errors": failed,
         }), 400
 
-    start = _to_location(geocoded[0])
-    end = _to_location(geocoded[-1])
-    stops = [_to_location(item) for item in geocoded[1:-1]]
+    locations = [_to_location(item) for item in geocoded]
+    start = locations[0]
+    end = locations[-1]
+    stops = locations[1:-1]
 
     try:
         result = optimize_route(
@@ -96,7 +108,7 @@ def optimize_route_endpoint():
         return jsonify({"error": str(exc)}), 500
 
     ordered_indices = result["ordered_indices"]
-    ordered_addresses = [addresses[i] for i in ordered_indices]
+    ordered_addresses = [locations[i].label for i in ordered_indices]
 
     return jsonify({
         "ordered_addresses": ordered_addresses,

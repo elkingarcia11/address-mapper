@@ -8,14 +8,16 @@ The interface is organized as a full-screen tabbed workflow. Each tab handles on
 
 ## Features
 
-- **Convert Blob to Addresses** — Use OpenAI to extract structured addresses from pasted text.
+- **Convert Blob to Addresses** — Use OpenAI to extract structured addresses from pasted text, normalized to a consistent format.
 - **Plot Addresses on Map** — Geocode a list of addresses and display them as interactive markers on Google Maps.
-- **Map View** — Dedicated map tab that fills the available screen space; markers show the original address line you entered.
+- **Map View** — Dedicated map tab that fills the available screen space; markers show the sanitized address for each stop.
 - **Optimize Route** — Reorder middle stops between a fixed start and end to minimize driving distance using OpenRouteService and Google OR-Tools.
-- **Optimized Route Results** — View the reordered address list and total route distance.
+- **Optimized Route Results** — View the reordered address list with numbered stop order and total route distance.
+- **Sanitized address format** — All addresses use `street address, city, ST ZIP` (example: `2249 Washington Ave, Bronx, NY 10456`). Apartment, unit, suite, and other extra details are stripped during conversion.
+- **Input validation** — Plot and Optimize reject addresses that are not already in the sanitized format.
 - **Per-tab API keys** — Enter only the keys needed for the tab you are using.
 - **Tab badges** — Visual indicators when a tab has new results waiting (Plot, Map View, Optimized Route Results).
-- **Copy extracted addresses** — Copy converted output directly from the Convert tab.
+- **Copy extracted addresses** — Copy the clean address list directly from the Convert tab.
 
 ## Tabs
 
@@ -28,6 +30,25 @@ The interface is organized as a full-screen tabbed workflow. Each tab handles on
 | Optimized Route Results | View optimized order and total distance | (uses keys from Optimize tab) |
 
 The Google Maps Geocoding key entered on the Plot or Optimize tab is kept in sync between those two tabs.
+
+## Address format
+
+All addresses in the app use this format:
+
+```text
+street address, city, ST ZIP
+```
+
+Example: `2249 Washington Ave, Bronx, NY 10456`
+
+During conversion, the app removes apartment numbers, unit numbers, suite numbers, floor/building details, country names, and list numbering. Plot and Optimize require input that already matches this format. After plotting or optimizing, results are written back in the same standardized form.
+
+| Step | Format enforcement |
+| --- | --- |
+| Convert Blob to Addresses | Extracts and normalizes addresses automatically |
+| Plot Addresses on Map | Requires sanitized input; validates before geocoding |
+| Optimize Route | Requires sanitized input; validates before optimizing |
+| Optimized Route Results | Shows numbered stop order (`1.`, `2.`, `3.`, …) for the optimized route |
 
 ## Requirements
 
@@ -69,22 +90,22 @@ The application has been designed with security in mind for handling user-provid
 
 1. Open the **Convert Blob to Addresses** tab.
 2. Paste unstructured text and click **Convert**.
-3. Extracted addresses appear in the output area and are copied into the **Plot Addresses on Map** tab automatically.
-4. Use **Copy** to copy the extracted list, or switch to the Plot tab to continue.
+3. Extracted addresses appear in the output area with line numbers on the right for easy reference. The clean address list is copied into the **Plot Addresses on Map** tab automatically.
+4. Use **Copy** to copy the sanitized list, or switch to the Plot tab to continue.
 
 ### Plot addresses on a map
 
 1. Open the **Plot Addresses on Map** tab (or use addresses from the Convert step).
-2. Enter one address per line and click **Plot**.
-3. The app geocodes each address and switches to **Map View**, where markers appear on a full-height map.
-4. Click a marker to see the original address line you entered.
+2. Enter one sanitized address per line in the format `street address, city, ST ZIP` and click **Plot**.
+3. The app validates each line, geocodes the addresses, and switches to **Map View**, where markers appear on a full-height map.
+4. Click a marker to see the sanitized address. After plotting, the address list is updated with geocoded, standardized formatting.
 
 ### Optimize a route
 
 1. Open the **Optimize Route** tab.
-2. Enter one address per line. The **first** address is the start, the **last** is the end, and middle stops are reordered to minimize driving distance.
+2. Enter one sanitized address per line in the format `street address, city, ST ZIP`. The **first** address is the start, the **last** is the end, and middle stops are reordered to minimize driving distance.
 3. Click **Optimize**.
-4. Results appear on the **Optimized Route Results** tab, including the reordered address list and total distance in miles and meters.
+4. Results appear on the **Optimized Route Results** tab, including the reordered address list with numbered stop order and total distance in miles and meters.
 
 ## Docker Testing Locally
 
@@ -151,7 +172,8 @@ This application uses OpenAI's GPT model to extract addresses from blocks of tex
 - The application validates API key formats but cannot guarantee their validity until they are used.
 - Make sure to use HTTPS in production environments for maximum security.
 - Route optimization requires at least two addresses (a start and an end). With only two addresses, no reordering is needed.
-- Map markers display the original address text you entered, not a separate geocoded street name.
+- Map markers and optimized route results use the sanitized address format, not raw pasted text.
+- Invalid addresses on the Plot or Optimize tabs are rejected with a list of lines that need fixing.
 
 ## License
 

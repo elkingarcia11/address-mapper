@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+from utils.address_format import format_address
+
 import openrouteservice
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
@@ -47,18 +49,11 @@ class Location:
 
     @property
     def label(self) -> str:
-        line1 = self.street_address_1.strip()
-        city_part = self.city.strip()
-        state_zip = " ".join(
-            part for part in (self.state.strip(), self.zip.strip()) if part
+        formatted = format_address(
+            self.street_address_1, self.city, self.state, self.zip
         )
-        line2 = ", ".join(part for part in (city_part, state_zip) if part)
-        if line1 and line2:
-            return f"{line1}, {line2}"
-        if line1:
-            return line1
-        if line2:
-            return line2
+        if formatted:
+            return formatted
         return f"{self.lat}, {self.lng}"
 
     def to_dict(self) -> dict:

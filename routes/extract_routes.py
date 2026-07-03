@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify
 import requests
-import re
 from os import getenv
+
+from utils.address_format import normalize_extracted_addresses
 
 # Create a blueprint for extract routes
 extract_bp = Blueprint('extract', __name__)
+
 
 def validate_openai_api_key(api_key):
     """Validate OpenAI API key format"""
@@ -40,7 +42,16 @@ def extract_addresses():
                 "messages": [
                     {
                         "role": "user",
-                        "content": f"Extract only the addresses from the following text, excluding any names or other details. The extracted addresses should include the street name, street number, city, state, and zip code, formatted correctly: \n\n{text}\n\nAddresses:"
+                        "content": (
+                            "Extract only street addresses from the following text. "
+                            "Format every address exactly as: street address, city, ST ZIP. "
+                            "Example: 2249 Washington Ave, Bronx, NY 10456. "
+                            "Use the 2-letter state abbreviation. "
+                            "Exclude names, phone numbers, apartment numbers, unit numbers, "
+                            "suite numbers, floor numbers, building names, and country names. "
+                            "Return one address per line with no numbering, bullets, or prefixes.\n\n"
+                            f"{text}\n\nAddresses:"
+                        )
                     }
                 ]
             },
@@ -53,7 +64,7 @@ def extract_addresses():
             first_choice = choices[0]
             addresses = first_choice.get(
                 "message", {}).get("content", "").strip()
-            return jsonify({"addresses": addresses})
+            return jsonify({"addresses": normalize_extracted_addresses(addresses)})
         else:
             return jsonify({"error": "Failed to extract addresses", "details": response.text}), response.status_code
     except Exception as e:

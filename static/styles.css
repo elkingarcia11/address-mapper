@@ -312,6 +312,38 @@ textarea::placeholder {
   user-select: text;
 }
 
+.convert-output-scroll {
+  overflow: auto;
+  padding: var(--space-xs) 0;
+}
+
+.convert-output-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  padding: 4px var(--space-md);
+  line-height: 1.5;
+}
+
+.convert-output-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.convert-output-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.convert-output-line {
+  flex: 0 0 auto;
+  min-width: 1.5rem;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .results-output:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(4, 163, 227, 0.12);

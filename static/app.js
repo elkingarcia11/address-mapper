@@ -213,6 +213,26 @@ function initMap() {
   });
 }
 
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderConvertOutput(addressesText) {
+  const output = document.getElementById("convertOutput");
+  const lines = addressesText.split("\n").filter((line) => line.trim());
+
+  output.innerHTML = lines
+    .map(
+      (address, index) =>
+        `<div class="convert-output-row"><span class="convert-output-text">${escapeHtml(address)}</span><span class="convert-output-line">${index + 1}</span></div>`
+    )
+    .join("");
+}
+
 async function extractAddresses() {
   if (!validateApiKeys(["openai"])) {
     return;
@@ -246,7 +266,7 @@ async function extractAddresses() {
     const addresses = data.addresses;
 
     document.getElementById("addressInput").value = addresses;
-    document.getElementById("convertOutput").value = addresses;
+    renderConvertOutput(addresses);
 
     const lineCount = addresses.split("\n").filter((line) => line.trim()).length;
     document.getElementById("convertOutputMeta").textContent =
@@ -268,14 +288,16 @@ async function optimizeRoute() {
     return;
   }
 
-  const addresses = document
-    .getElementById("optimizeInput")
-    .value.split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const addressText = document.getElementById("optimizeInput").value;
+  const { valid: addresses, invalid } = validateSanitizedAddresses(addressText);
 
   if (addresses.length < 2) {
     alert("Enter at least two addresses: one start and one end.");
+    return;
+  }
+
+  if (invalid.length > 0) {
+    alert(formatSanitizedAddressError(invalid));
     return;
   }
 
@@ -301,6 +323,9 @@ async function optimizeRoute() {
     const data = await response.json();
 
     if (!response.ok) {
+      if (data.invalid_addresses?.length) {
+        throw new Error(formatSanitizedAddressError(data.invalid_addresses));
+      }
       if (data.geocoding_errors) {
         const failed = data.geocoding_errors
           .map((item) => `${item.address}: ${item.error}`)
@@ -310,8 +335,9 @@ async function optimizeRoute() {
       throw new Error(data.error || "Failed to optimize route");
     }
 
-    document.getElementById("optimizeOutput").value =
-      data.ordered_addresses.join("\n");
+    document.getElementById("optimizeOutput").value = data.ordered_addresses
+      .map((address, index) => `${index + 1}. ${address}`)
+      .join("\n");
     document.getElementById("optimizeDistance").textContent =
       `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`;
 
@@ -333,12 +359,74 @@ async function optimizeRoute() {
   }
 }
 
+const SANITIZED_ADDRESS_RE =
+  /^.+,\s*[^,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?\s*$/i;
+const LEADING_NUMBER_RE = /^\s*\d+[.)]\s*/;
+const APT_IN_ADDRESS_RE =
+  /(?:,\s*(?:Apt|Apartment|Unit|Ste|Suite|Rm|Room)\.?\s*#?\s*[\w-]+|\s+(?:Apt|Apartment|Unit|Ste|Suite|Rm|Room)\.?\s*#?\s*[\w-]+|\s+#\s*[\w-]+)/i;
+
+function isSanitizedAddressLine(line) {
+  if (LEADING_NUMBER_RE.test(line)) {
+    return false;
+  }
+  if (APT_IN_ADDRESS_RE.test(line)) {
+    return false;
+  }
+  return SANITIZED_ADDRESS_RE.test(line);
+}
+
+function validateSanitizedAddresses(text) {
+  const valid = [];
+  const invalid = [];
+
+  for (const line of text.split("\n")) {
+    const stripped = line.trim();
+    if (!stripped) {
+      continue;
+    }
+    if (isSanitizedAddressLine(stripped)) {
+      valid.push(stripped);
+    } else {
+      invalid.push(stripped);
+    }
+  }
+
+  return { valid, invalid };
+}
+
+function formatSanitizedAddressError(invalidAddresses) {
+  const preview = invalidAddresses.slice(0, 5).join("\n");
+  const suffix =
+    invalidAddresses.length > 5
+      ? `\n...and ${invalidAddresses.length - 5} more`
+      : "";
+  return (
+    "Each address must use the format: street address, city, ST ZIP\n" +
+    "Example: 2249 Washington Ave, Bronx, NY 10456\n\n" +
+    "Fix these lines:\n" +
+    preview +
+    suffix
+  );
+}
+
 async function geocodeAddresses() {
   if (!validateApiKeys(["googleMapsGeo", "googleMapsJs"])) {
     return;
   }
 
-  const addresses = document.getElementById("addressInput").value.split("\n");
+  const addressText = document.getElementById("addressInput").value;
+  const { valid: addresses, invalid } = validateSanitizedAddresses(addressText);
+
+  if (addresses.length === 0) {
+    alert("Enter at least one address.");
+    return;
+  }
+
+  if (invalid.length > 0) {
+    alert(formatSanitizedAddressError(invalid));
+    return;
+  }
+
   const apiKeys = getApiKeys();
   const spinnerContainer = document.getElementById("spinnerContainer");
   const mapElement = document.getElementById("map");
@@ -364,6 +452,9 @@ async function geocodeAddresses() {
 
     if (!response.ok) {
       const errorData = await response.json();
+      if (errorData.invalid_addresses?.length) {
+        throw new Error(formatSanitizedAddressError(errorData.invalid_addresses));
+      }
       throw new Error(errorData.error || "Failed to geocode addresses");
     }
 
@@ -407,6 +498,14 @@ async function geocodeAddresses() {
         activeInfoWindow = infoWindow;
       });
     });
+
+    const formattedAddresses = results
+      .filter((result) => !result.error && result.address)
+      .map((result) => result.address)
+      .join("\n");
+    if (formattedAddresses) {
+      document.getElementById("addressInput").value = formattedAddresses;
+    }
 
     mapElement.style.display = "block";
     document.getElementById("mapEmptyHint").classList.add("hidden");
@@ -462,7 +561,7 @@ function updateButtonStates() {
 
 function clearBlobInput() {
   document.getElementById("blobInput").value = "";
-  document.getElementById("convertOutput").value = "";
+  document.getElementById("convertOutput").innerHTML = "";
   document.getElementById("convertOutputMeta").textContent = "";
   document.getElementById("convertOutputSection").classList.add("hidden");
   const copyBtn = document.getElementById("copyConvertOutput");
@@ -472,8 +571,7 @@ function clearBlobInput() {
 }
 
 async function copyConvertOutput() {
-  const output = document.getElementById("convertOutput");
-  const text = output.value;
+  const text = document.getElementById("addressInput").value;
   if (!text.trim()) {
     return;
   }
@@ -483,9 +581,12 @@ async function copyConvertOutput() {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    output.focus();
-    output.select();
+    const temp = document.createElement("textarea");
+    temp.value = text;
+    document.body.appendChild(temp);
+    temp.select();
     document.execCommand("copy");
+    document.body.removeChild(temp);
   }
 
   copyBtn.textContent = "Copied!";
@@ -556,10 +657,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   document.getElementById("googleMapsGeoApiKeyOptimize").addEventListener("input", () => {
     syncGoogleMapsGeoKeys("googleMapsGeoApiKeyOptimize");
-  });
-
-  document.getElementById("convertOutput").addEventListener("focus", function () {
-    this.select();
   });
 
   updateButtonStates();

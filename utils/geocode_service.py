@@ -1,5 +1,6 @@
 import requests
 
+from utils.address_format import format_address
 from utils.geocode_utils import extract_address_fields
 
 
@@ -30,8 +31,14 @@ def geocode_addresses(addresses, google_maps_geo_api_key):
         top_result = result["results"][0]
         location = top_result["geometry"]["location"]
         fields = extract_address_fields(top_result)
+        formatted_address = format_address(
+            fields["street_address_1"],
+            fields["city"],
+            fields["state"],
+            fields["zip"],
+        )
         geocoded_results.append({
-            "address": address,
+            "address": formatted_address or address,
             "latitude": location["lat"],
             "longitude": location["lng"],
             "street_address": fields["street_address_1"],

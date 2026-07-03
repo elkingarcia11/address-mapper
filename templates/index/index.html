@@ -80,7 +80,7 @@
                   </div>
                   <button id="copyConvertOutput" type="button" class="btn btn-copy btn-sm" onclick="copyConvertOutput()">Copy</button>
                 </div>
-                <textarea id="convertOutput" rows="10" readonly class="results-output" aria-readonly="true" tabindex="0"></textarea>
+                <div id="convertOutput" class="convert-output-scroll results-output" tabindex="0" role="region" aria-label="Extracted addresses"></div>
               </div>
             </div>
           </section>
@@ -90,7 +90,7 @@
             <div class="panel-card">
               <div class="panel-header">
                 <h2>Plot Addresses on Map</h2>
-                <p class="panel-hint">One address per line. Format: <em>2249 Washington Ave, Bronx, NY 10456</em></p>
+                <p class="panel-hint">One address per line in sanitized format: <em>street address, city, ST ZIP</em> (example: <em>2249 Washington Ave, Bronx, NY 10456</em>). Use Convert Blob to Addresses to prepare input.</p>
               </div>
 
               <div class="panel-section api-section">
@@ -110,7 +110,7 @@
               <div class="panel-section panel-section--grow">
                 <div id="plotResultBanner" class="result-banner hidden"></div>
                 <label class="section-label" for="addressInput">Addresses</label>
-                <textarea id="addressInput" rows="10" placeholder="Enter one address per line..."></textarea>
+                <textarea id="addressInput" rows="10" placeholder="2249 Washington Ave, Bronx, NY 10456"></textarea>
               </div>
 
               <div class="panel-actions">
@@ -142,7 +142,7 @@
             <div class="panel-card">
               <div class="panel-header">
                 <h2>Optimize Route</h2>
-                <p class="panel-hint">One address per line. The <strong>first</strong> is the start, the <strong>last</strong> is the end; middle stops are reordered to minimize driving distance.</p>
+                <p class="panel-hint">One sanitized address per line: <em>street address, city, ST ZIP</em> (example: <em>2249 Washington Ave, Bronx, NY 10456</em>). The <strong>first</strong> is the start, the <strong>last</strong> is the end; middle stops are reordered to minimize driving distance.</p>
               </div>
 
               <div class="panel-section api-section">
@@ -162,7 +162,7 @@
               <div class="panel-section panel-section--grow">
                 <div id="optimizeResultBanner" class="result-banner hidden"></div>
                 <label class="section-label" for="optimizeInput">Addresses</label>
-                <textarea id="optimizeInput" rows="10" placeholder="Enter one address per line..."></textarea>
+                <textarea id="optimizeInput" rows="10" placeholder="2249 Washington Ave, Bronx, NY 10456"></textarea>
               </div>
 
               <div class="panel-actions">

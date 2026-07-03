@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 
+from utils.address_format import validate_sanitized_address_lines
 from utils.geocode_service import geocode_addresses
 
 # Create a blueprint for geocode routes
@@ -27,5 +28,17 @@ def geocode():
     if not validate_google_maps_api_key(google_maps_geo_api_key):
         return jsonify({"error": "Invalid Google Maps API key format"}), 400
 
-    geocoded_results = geocode_addresses(addresses, google_maps_geo_api_key)
+    valid_addresses, invalid_addresses = validate_sanitized_address_lines(addresses)
+    if not valid_addresses:
+        return jsonify({"error": "No addresses provided"}), 400
+    if invalid_addresses:
+        return jsonify({
+            "error": (
+                "Each address must use the format: street address, city, ST ZIP "
+                "(example: 2249 Washington Ave, Bronx, NY 10456)."
+            ),
+            "invalid_addresses": invalid_addresses,
+        }), 400
+
+    geocoded_results = geocode_addresses(valid_addresses, google_maps_geo_api_key)
     return jsonify({"results": geocoded_results})
