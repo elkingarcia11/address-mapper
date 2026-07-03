@@ -386,7 +386,7 @@ async function geocodeAddresses() {
       const marker = new google.maps.Marker({
         position: { lat: result.latitude, lng: result.longitude },
         map: map,
-        title: result.street_address,
+        title: result.address,
       });
 
       markers.push(marker);
@@ -396,7 +396,7 @@ async function geocodeAddresses() {
       }
 
       const infoWindow = new google.maps.InfoWindow({
-        content: `<strong>${result.street_address}</strong><br>${result.address}`,
+        content: result.address,
       });
 
       marker.addListener("click", () => {
@@ -563,4 +563,10 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   updateButtonStates();
+
+  window.addEventListener("resize", () => {
+    if (activeTab === "map" && map) {
+      google.maps.event.trigger(map, "resize");
+    }
+  });
 });

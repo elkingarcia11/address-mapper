@@ -35,6 +35,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -42,21 +47,25 @@ body {
   font-family: var(--font);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
 .app-shell {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: var(--space-lg) var(--space-md) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-md);
+  gap: var(--space-md);
 }
 
 .app-header {
-  margin-bottom: var(--space-lg);
+  flex-shrink: 0;
+  padding: var(--space-xs) var(--space-sm);
 }
 
 .app-header h1 {
-  margin: 0 0 var(--space-xs);
-  font-size: 1.75rem;
+  margin: 0 0 2px;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.02em;
@@ -65,10 +74,14 @@ body {
 .app-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: 0.875rem;
 }
 
 .workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -78,6 +91,7 @@ body {
 
 /* Tabs */
 .tab-bar {
+  flex-shrink: 0;
   display: flex;
   gap: 0;
   padding: 0 var(--space-md);
@@ -133,27 +147,41 @@ body {
 }
 
 .tab-panels {
-  padding: var(--space-lg);
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-md);
+  overflow: hidden;
 }
 
 .tab-panel {
   display: none;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .tab-panel.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Panel card */
 .panel-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-md);
+  flex: 1;
+  min-height: 0;
+}
+
+.panel-header,
+.api-section,
+.panel-actions {
+  flex-shrink: 0;
 }
 
 .panel-header h2 {
   margin: 0 0 var(--space-xs);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.01em;
@@ -187,6 +215,20 @@ body {
 
 .panel-section--flush {
   gap: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-section--grow {
+  flex: 1;
+  min-height: 0;
+}
+
+.panel-section--grow textarea {
+  flex: 1;
+  min-height: 140px;
 }
 
 .section-label {
@@ -253,8 +295,8 @@ textarea:focus {
 }
 
 textarea {
-  min-height: 180px;
-  resize: vertical;
+  min-height: 140px;
+  resize: none;
   line-height: 1.5;
 }
 
@@ -264,7 +306,8 @@ textarea::placeholder {
 
 .results-output {
   background: var(--surface-muted);
-  min-height: 180px;
+  flex: 1;
+  min-height: 140px;
   cursor: text;
   user-select: text;
 }
@@ -419,11 +462,16 @@ textarea::placeholder {
 /* Map */
 #map {
   width: 100%;
-  height: 460px;
+  flex: 1;
+  min-height: 240px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   display: none;
   background: var(--surface-muted);
+}
+
+#tab-map .panel-card {
+  gap: var(--space-sm);
 }
 
 /* Spinner */
@@ -456,11 +504,20 @@ textarea::placeholder {
 
 @media (max-width: 720px) {
   .app-shell {
-    padding: var(--space-md) var(--space-sm) var(--space-lg);
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+  }
+
+  .app-header h1 {
+    font-size: 1.15rem;
+  }
+
+  .app-subtitle {
+    font-size: 0.8rem;
   }
 
   .tab-panels {
-    padding: var(--space-md);
+    padding: var(--space-sm);
   }
 
   .field-grid {
@@ -482,6 +539,6 @@ textarea::placeholder {
   }
 
   #map {
-    height: 340px;
+    min-height: 200px;
   }
 }
