@@ -165,6 +165,19 @@ function readPersistedSettings() {
   }
 }
 
+function getTruckRouteMode() {
+  const truckRouteModeInput = document.getElementById("truckRouteMode");
+  return truckRouteModeInput?.value === "cross_city"
+    ? "cross_city"
+    : "local_delivery";
+}
+
+function getTruckRouteModeLabel(mode) {
+  return mode === "cross_city"
+    ? "Through truck routes (cross-city)"
+    : "Local truck routes (deliveries)";
+}
+
 function collectPersistedSettings() {
   return {
     openaiApiKey: document.getElementById("openaiApiKey").value,
@@ -174,6 +187,7 @@ function collectPersistedSettings() {
     optimizeStartInput: document.getElementById("optimizeStartInput").value,
     optimizeEndInput: document.getElementById("optimizeEndInput").value,
     optimizeEndSameAsStart: document.getElementById("optimizeEndSameAsStart").checked,
+    truckRouteMode: getTruckRouteMode(),
   };
 }
 
@@ -218,6 +232,12 @@ function loadPersistedSettings() {
   if (typeof data.optimizeEndInput === "string") {
     document.getElementById("optimizeEndInput").value = data.optimizeEndInput;
   }
+  if (
+    data.truckRouteMode === "local_delivery" ||
+    data.truckRouteMode === "cross_city"
+  ) {
+    document.getElementById("truckRouteMode").value = data.truckRouteMode;
+  }
 }
 
 function bindPersistedSettings() {
@@ -235,6 +255,9 @@ function bindPersistedSettings() {
 
   document
     .getElementById("optimizeEndSameAsStart")
+    .addEventListener("change", savePersistedSettings);
+  document
+    .getElementById("truckRouteMode")
     .addEventListener("change", savePersistedSettings);
 }
 
@@ -554,6 +577,7 @@ async function optimizeRoute() {
     ors_api_key: apiKeys.ors,
     split_mode: splitMode,
     num_routes: numRoutes,
+    truck_route_mode: getTruckRouteMode(),
   };
 
   if (splitMode === "manual") {
@@ -567,7 +591,7 @@ async function optimizeRoute() {
     estimateSeconds,
     steps: [
       "Geocoding addresses...",
-      "Building driving distance matrix...",
+      "Building truck distance matrix...",
       "Assigning stops to routes...",
       "Finalizing route order...",
     ],
@@ -601,10 +625,12 @@ async function optimizeRoute() {
 
     const startLabel = data.start_label || data.depot_label;
     const endLabel = data.end_label || data.depot_label;
+    const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
     const outputLines = [
       `Start: ${startLabel}`,
       `End: ${endLabel}`,
       "",
+      `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
       `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
     ];
 

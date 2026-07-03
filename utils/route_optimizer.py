@@ -12,6 +12,15 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 ORS_MATRIX_PAIR_LIMIT = 3500
 DEFAULT_ORS_CHUNK_SIZE = 50
+DEFAULT_TRUCK_PROFILE = "driving-hgv"
+VALID_TRUCK_ROUTE_MODES = frozenset({"local_delivery", "cross_city"})
+DEFAULT_TRUCK_ROUTE_MODE = "local_delivery"
+DEFAULT_TRUCK_RESTRICTIONS = {
+    "height": 4.0,
+    "width": 2.6,
+    "length": 13.7,
+    "weight": 18.0,
+}
 
 
 @dataclass(frozen=True)
@@ -78,11 +87,33 @@ def _ors_distance_to_int(value: float | None, from_idx: int, to_idx: int) -> int
     return int(round(value))
 
 
+def normalize_truck_route_mode(raw_mode: str | None) -> str:
+    mode = (raw_mode or DEFAULT_TRUCK_ROUTE_MODE).strip()
+    if mode not in VALID_TRUCK_ROUTE_MODES:
+        raise ValueError(
+            "truck_route_mode must be 'local_delivery' or 'cross_city'."
+        )
+    return mode
+
+
+def build_truck_routing_options(truck_route_mode: str) -> dict:
+    """Build ORS HGV options for delivery vs cross-city truck routing."""
+    mode = normalize_truck_route_mode(truck_route_mode)
+    vehicle_type = "delivery" if mode == "local_delivery" else "hgv"
+    return {
+        "vehicle_type": vehicle_type,
+        "profile_params": {
+            "restrictions": dict(DEFAULT_TRUCK_RESTRICTIONS),
+        },
+    }
+
+
 def build_distance_matrix_ors(
     locations: Sequence[Location],
     *,
     api_key: str,
-    profile: str = "driving-car",
+    profile: str = DEFAULT_TRUCK_PROFILE,
+    truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
 ) -> list[list[int]]:
     n = len(locations)
@@ -97,7 +128,8 @@ def build_distance_matrix_ors(
 
     ors_locations = [loc.to_ors() for loc in locations]
     matrix = [[0] * n for _ in range(n)]
-    client = openrouteservice.Client(key=api_key)
+    client = openrouteservice.Client(key=api_key, timeout=300)
+    routing_options = build_truck_routing_options(truck_route_mode)
 
     for src_start in range(0, n, chunk_size):
         sources = list(range(src_start, min(src_start + chunk_size, n)))
@@ -110,13 +142,17 @@ def build_distance_matrix_ors(
                     f"{ORS_MATRIX_PAIR_LIMIT}). Reduce chunk_size."
                 )
 
-            response = client.distance_matrix(
-                locations=ors_locations,
-                profile=profile,
-                sources=sources,
-                destinations=destinations,
-                metrics=["distance"],
-                units="m",
+            response = client.request(
+                f"/v2/matrix/{profile}/json",
+                {},
+                post_json={
+                    "locations": ors_locations,
+                    "sources": sources,
+                    "destinations": destinations,
+                    "metrics": ["distance"],
+                    "units": "m",
+                    "options": routing_options,
+                },
             )
             distances = response["distances"]
             for i, src_idx in enumerate(sources):
@@ -190,7 +226,8 @@ def optimize_route(
     end: Location,
     *,
     api_key: str,
-    profile: str = "driving-car",
+    profile: str = DEFAULT_TRUCK_PROFILE,
+    truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     time_limit_seconds: int = 5,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
 ) -> dict:
@@ -201,6 +238,7 @@ def optimize_route(
             locations,
             api_key=api_key,
             profile=profile,
+            truck_route_mode=truck_route_mode,
             chunk_size=ors_chunk_size,
         )
         total_distance = distance_matrix[0][1]
@@ -216,12 +254,14 @@ def optimize_route(
             "total_distance_meters": total_distance,
             "distance_source": "openrouteservice",
             "profile": profile,
+            "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
         }
 
     distance_matrix = build_distance_matrix_ors(
         locations,
         api_key=api_key,
         profile=profile,
+        truck_route_mode=truck_route_mode,
         chunk_size=ors_chunk_size,
     )
     num_locations = len(locations)
@@ -284,6 +324,7 @@ def optimize_route(
         "total_distance_meters": total_distance,
         "distance_source": "openrouteservice",
         "profile": profile,
+        "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
     }
 
 
@@ -293,7 +334,8 @@ def optimize_multi_route(
     route_capacities: Sequence[int],
     *,
     api_key: str,
-    profile: str = "driving-car",
+    profile: str = DEFAULT_TRUCK_PROFILE,
+    truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     time_limit_seconds: int = 30,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
 ) -> dict:
@@ -319,6 +361,7 @@ def optimize_multi_route(
         locations,
         api_key=api_key,
         profile=profile,
+        truck_route_mode=truck_route_mode,
         chunk_size=ors_chunk_size,
     )
 
@@ -409,6 +452,7 @@ def optimize_multi_route(
         "total_distance_meters": total_distance,
         "distance_source": "openrouteservice",
         "profile": profile,
+        "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
     }
 
 
@@ -418,7 +462,8 @@ def optimize_balanced_multi_route(
     num_routes: int,
     *,
     api_key: str,
-    profile: str = "driving-car",
+    profile: str = DEFAULT_TRUCK_PROFILE,
+    truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     time_limit_seconds: int = 30,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
     balance_weight: int = 100,
@@ -444,6 +489,7 @@ def optimize_balanced_multi_route(
         locations,
         api_key=api_key,
         profile=profile,
+        truck_route_mode=truck_route_mode,
         chunk_size=ors_chunk_size,
     )
 
@@ -498,7 +544,7 @@ def optimize_balanced_multi_route(
     if solution is None:
         raise RuntimeError(
             "No solution found for the current stops and route count. "
-            "Verify all addresses geocoded correctly and are reachable by car."
+            "Verify all addresses geocoded correctly and are reachable by truck."
         )
 
     routes: list[dict] = []
@@ -545,4 +591,5 @@ def optimize_balanced_multi_route(
         "total_distance_meters": total_distance,
         "distance_source": "openrouteservice",
         "profile": profile,
+        "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
     }

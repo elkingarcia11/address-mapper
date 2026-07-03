@@ -6,6 +6,7 @@ from utils.geocode_service import geocode_addresses
 from utils.route_optimizer import (
     Location,
     compute_vrp_time_limit,
+    normalize_truck_route_mode,
     optimize_balanced_multi_route,
     optimize_multi_route,
     optimize_route,
@@ -95,7 +96,13 @@ def optimize_route_endpoint():
         data.get("google_maps_geo_api_key", "")
     )
     ors_api_key = _normalize_api_key(data.get("ors_api_key", ""))
-    profile = data.get("profile", "driving-car")
+    profile = data.get("profile", "driving-hgv")
+    try:
+        truck_route_mode = normalize_truck_route_mode(
+            data.get("truck_route_mode")
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     split_mode = data.get("split_mode", "manual")
     route_capacities = data.get("route_capacities")
     num_routes = data.get("num_routes")
@@ -219,6 +226,7 @@ def optimize_route_endpoint():
                     parsed_num_routes,
                     api_key=ors_api_key,
                     profile=profile,
+                    truck_route_mode=truck_route_mode,
                     time_limit_seconds=effective_time_limit,
                 )
             else:
@@ -246,6 +254,7 @@ def optimize_route_endpoint():
                     parsed_capacities,
                     api_key=ors_api_key,
                     profile=profile,
+                    truck_route_mode=truck_route_mode,
                     time_limit_seconds=effective_time_limit,
                 )
         else:
@@ -255,6 +264,7 @@ def optimize_route_endpoint():
                 end,
                 api_key=ors_api_key,
                 profile=profile,
+                truck_route_mode=truck_route_mode,
                 time_limit_seconds=time_limit_seconds,
             )
     except ValueError as exc:
@@ -306,6 +316,9 @@ def optimize_route_endpoint():
                 result["total_distance_meters"] / 1609.344, 2
             ),
             "profile": result["profile"],
+            "truck_route_mode": result.get(
+                "truck_route_mode", truck_route_mode
+            ),
         }
         if result.get("num_routes") is not None:
             response_payload["num_routes"] = result["num_routes"]

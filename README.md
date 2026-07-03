@@ -2,7 +2,7 @@
 
 ## Overview
 
-Address Mapper is a web application for working with address lists: extract addresses from unstructured text, geocodes and plot them on a map, and optimize driving routes across one or more vehicles. Users provide their own API keys through the browser — nothing is stored on the server.
+Address Mapper is a web application for working with address lists: extract addresses from unstructured text, geocodes and plot them on a map, and optimize truck routes across one or more vehicles. Users provide their own API keys through the browser — nothing is stored on the server.
 
 The interface is organized as a full-screen tabbed workflow. Each tab handles one step, and results flow forward (for example, converted addresses are copied into the Plot tab automatically).
 
@@ -12,11 +12,12 @@ The interface is organized as a full-screen tabbed workflow. Each tab handles on
 - **Plot Addresses on Map** — Geocode a list of addresses and display them as interactive markers on Google Maps.
 - **Map View** — Dedicated map tab that fills the available screen space; markers show the sanitized address for each stop.
 - **Multi-route optimization** — Split stops across multiple routes from a shared start/end hub, with manual stop counts per route or automatic balancing by driving distance.
+- **Truck routing** — OpenRouteService HGV profile with local delivery vs cross-city through-truck modes and vehicle weight/height restrictions for allowed bridge crossings.
 - **Optimized Route Results** — View each route with numbered stop order, per-route distance, and total distance.
 - **Sanitized address format** — Addresses use `street address, city, ST ZIP`. ZIP is optional when geocoding can resolve the location (example without ZIP: `1101 Forest Ave, Bronx, NY`).
 - **Input validation** — Plot and Optimize reject malformed addresses and list lines that need fixing.
 - **Per-tab API keys** — Enter only the keys needed for the tab you are using. Keys can be shown/hidden with the eye toggle.
-- **Browser-side settings cache** — API keys and optimize start/end fields are saved in `localStorage` so you do not have to re-enter them on every visit.
+- **Browser-side settings cache** — API keys, optimize start/end fields, and truck routing mode are saved in `localStorage` so you do not have to re-enter them on every visit.
 - **Non-blocking progress panel** — Long-running Convert, Plot, and Optimize jobs show a bottom-right progress card with elapsed time and step updates instead of freezing the page.
 - **Tab badges** — Visual indicators when a tab has new results waiting (Plot, Map View, Optimized Route Results).
 - **Copy extracted addresses** — Copy the clean address list directly from the Convert tab.
@@ -97,7 +98,7 @@ The application has been designed with security in mind for handling user-provid
    - **Plot Addresses on Map**: Google Maps Geocoding and JavaScript API keys
    - **Optimize Route**: Google Maps Geocoding and OpenRouteService API keys
 
-Saved API keys and optimize start/end values reload automatically from browser `localStorage` on your next visit.
+Saved API keys, optimize start/end values, and truck routing preference reload automatically from browser `localStorage` on your next visit.
 
 ### Convert addresses from text
 
@@ -121,8 +122,13 @@ Saved API keys and optimize start/end values reload automatically from browser `
 4. Choose how stops are assigned:
    - **Specify stops per route** — Set the number of routes and how many stops each route should get.
    - **Balance routes by distance** — Set only the number of routes; the optimizer splits stops to keep driving distance per route roughly even.
-5. Click **Optimize**. A progress card appears in the bottom-right with status updates; large jobs (dozens of stops) may take a few minutes.
-6. Results appear on the **Optimized Route Results** tab, including:
+5. Choose **Truck routing**:
+   - **Local truck routes (deliveries)** — For last-mile delivery within a borough or city area.
+   - **Through truck routes (cross-city)** — For longer cross-city travel between hubs.
+   - Distances use the OpenRouteService `driving-hgv` profile with truck weight/height limits so routes avoid roads and bridges trucks cannot use.
+6. Click **Optimize**. A progress card appears in the bottom-right with status updates; large jobs (dozens of stops) may take a few minutes.
+7. Results appear on the **Optimized Route Results** tab, including:
+   - Truck routing mode used (local delivery or cross-city)
    - Start and end for each route
    - Numbered stop order per route
    - Per-route and total distance in miles and meters
@@ -136,10 +142,13 @@ Saved API keys and optimize start/end values reload automatically from browser `
   "stops": ["100 Grand Concourse, Bronx, NY 10451"],
   "split_mode": "manual",
   "route_capacities": [5, 5],
+  "truck_route_mode": "local_delivery",
   "google_maps_geo_api_key": "...",
   "ors_api_key": "..."
 }
 ```
+
+`truck_route_mode` accepts `local_delivery` (default) or `cross_city`. Both use the `driving-hgv` profile; local delivery applies delivery-truck routing options, while cross-city uses through-truck routing options. Vehicle restrictions (height, width, length, weight) filter out disallowed bridge crossings where OpenRouteService has that data.
 
 For balanced splitting, send `"split_mode": "balanced_distance"` and `"num_routes": 3` instead of `route_capacities`.
 
@@ -180,7 +189,7 @@ The Docker container uses Gunicorn as the WSGI server and exposes the applicatio
 
 ### OpenRouteService API Key
 
-- Required for route optimization (driving distance matrix)
+- Required for route optimization (truck distance matrix via the HGV profile)
 - Sign up at [openrouteservice.org](https://openrouteservice.org/) to obtain a key
 - Used to calculate distances between stops; OR-Tools handles stop assignment and reordering
 
@@ -212,6 +221,7 @@ This application uses OpenAI's GPT model to extract addresses from blocks of tex
 - Make sure to use HTTPS in production environments for maximum security.
 - Multi-route optimization requires at least one stop plus valid start and end addresses. Balanced mode requires at least as many stops as routes.
 - Multi-route optimization currently requires the same start and end address for every route.
+- Truck routing approximates NYC-style local truck routes, through truck routes, and allowed bridge crossings using OpenRouteService HGV data. It is not a direct import of NYC DOT truck route layers; verify critical legs against official maps if compliance is required.
 - Large optimize jobs show a non-blocking progress panel; the page stays usable while the server geocodes, builds the distance matrix, and runs OR-Tools.
 - Map markers and optimized route results use the sanitized address format, not raw pasted text.
 - Invalid addresses on the Plot or Optimize tabs are rejected with a list of lines that need fixing.

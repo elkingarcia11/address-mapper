@@ -185,6 +185,17 @@
                       <option value="balanced_distance">Balance routes by distance</option>
                     </select>
                   </div>
+                  <div class="field-group field-group--full">
+                    <label for="truckRouteMode">Truck routing</label>
+                    <select id="truckRouteMode">
+                      <option value="local_delivery">Local truck routes (deliveries)</option>
+                      <option value="cross_city">Through truck routes (cross-city)</option>
+                    </select>
+                    <p class="field-hint">
+                      Routes use the HGV driving profile and only roads suitable for trucks,
+                      including allowed bridge crossings within standard weight and height limits.
+                    </p>
+                  </div>
                 </div>
                 <div class="section-label-row">
                   <label class="section-label" for="routeCapacitySummary">Assignment summary</label>
