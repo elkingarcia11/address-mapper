@@ -4,6 +4,7 @@ from routes.geocode_routes import validate_google_maps_api_key
 from utils.address_format import validate_sanitized_address_lines
 from utils.geocode_service import geocode_addresses
 from utils.route_optimizer import (
+    DEFAULT_STOP_SERVICE_SECONDS,
     Location,
     compute_vrp_time_limit,
     normalize_truck_route_mode,
@@ -107,13 +108,29 @@ def optimize_route_endpoint():
     route_capacities = data.get("route_capacities")
     num_routes = data.get("num_routes")
 
-    if split_mode not in {"manual", "balanced_distance"}:
+    if split_mode not in {"manual", "balanced_duration", "balanced_distance"}:
         return jsonify({
-            "error": "split_mode must be 'manual' or 'balanced_distance'.",
+            "error": "split_mode must be 'manual' or 'balanced_duration'.",
         }), 400
 
-    balanced_mode = split_mode == "balanced_distance"
+    balanced_mode = split_mode in {"balanced_duration", "balanced_distance"}
     multi_route = balanced_mode or route_capacities is not None
+
+    raw_service_seconds = data.get("stop_service_seconds")
+    if raw_service_seconds is None:
+        stop_service_seconds = DEFAULT_STOP_SERVICE_SECONDS
+    else:
+        try:
+            stop_service_seconds = int(raw_service_seconds)
+        except (TypeError, ValueError):
+            return jsonify({
+                "error": "stop_service_seconds must be a non-negative integer.",
+            }), 400
+        if stop_service_seconds < 0:
+            return jsonify({
+                "error": "stop_service_seconds must be a non-negative integer.",
+            }), 400
+
     user_time_limit = data.get("time_limit_seconds")
     default_time_limit = 30 if multi_route else 5
     time_limit_seconds = (
@@ -201,7 +218,7 @@ def optimize_route_endpoint():
             if balanced_mode:
                 if num_routes is None:
                     return jsonify({
-                        "error": "num_routes is required when split_mode is balanced_distance.",
+                        "error": "num_routes is required when split_mode is balanced_duration.",
                     }), 400
                 parsed_num_routes = _parse_num_routes(num_routes)
                 if parsed_num_routes > len(stops):
@@ -228,6 +245,7 @@ def optimize_route_endpoint():
                     profile=profile,
                     truck_route_mode=truck_route_mode,
                     time_limit_seconds=effective_time_limit,
+                    stop_service_seconds=stop_service_seconds,
                 )
             else:
                 parsed_capacities = _parse_route_capacities(route_capacities)
@@ -256,6 +274,7 @@ def optimize_route_endpoint():
                     profile=profile,
                     truck_route_mode=truck_route_mode,
                     time_limit_seconds=effective_time_limit,
+                    stop_service_seconds=stop_service_seconds,
                 )
         else:
             result = optimize_route(
@@ -266,6 +285,7 @@ def optimize_route_endpoint():
                 profile=profile,
                 truck_route_mode=truck_route_mode,
                 time_limit_seconds=time_limit_seconds,
+                stop_service_seconds=stop_service_seconds,
             )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -300,6 +320,11 @@ def optimize_route_endpoint():
                 "ordered_locations": route["ordered_locations"],
                 "distance_meters": route["distance_meters"],
                 "distance_miles": round(route["distance_meters"] / 1609.344, 2),
+                "duration_seconds": route["duration_seconds"],
+                "service_seconds": route.get("service_seconds", 0),
+                "time_seconds": route.get(
+                    "time_seconds", route["duration_seconds"]
+                ),
             })
 
         response_payload = {
@@ -315,6 +340,15 @@ def optimize_route_endpoint():
             "total_distance_miles": round(
                 result["total_distance_meters"] / 1609.344, 2
             ),
+            "total_duration_seconds": result["total_duration_seconds"],
+            "total_service_seconds": result.get("total_service_seconds", 0),
+            "total_time_seconds": result.get(
+                "total_time_seconds", result["total_duration_seconds"]
+            ),
+            "stop_service_seconds": result.get(
+                "stop_service_seconds", stop_service_seconds
+            ),
+            "optimization_metric": result.get("optimization_metric", "total_time"),
             "profile": result["profile"],
             "truck_route_mode": result.get(
                 "truck_route_mode", truck_route_mode
@@ -332,6 +366,15 @@ def optimize_route_endpoint():
         "ordered_addresses": ordered_addresses,
         "total_distance_meters": result["total_distance_meters"],
         "total_distance_miles": round(result["total_distance_meters"] / 1609.344, 2),
+        "total_duration_seconds": result["total_duration_seconds"],
+        "total_service_seconds": result.get("total_service_seconds", 0),
+        "total_time_seconds": result.get(
+            "total_time_seconds", result["total_duration_seconds"]
+        ),
+        "stop_service_seconds": result.get(
+            "stop_service_seconds", stop_service_seconds
+        ),
+        "optimization_metric": result.get("optimization_metric", "total_time"),
         "profile": result["profile"],
         "ordered_locations": result["ordered_locations"],
     })

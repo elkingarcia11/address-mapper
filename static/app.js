@@ -7,6 +7,20 @@ let activeTab = "convert";
 let progressIntervalId = null;
 let progressContext = null;
 
+function formatDriveDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${remainingSeconds}s`;
+}
+
 function formatElapsedDuration(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -591,7 +605,7 @@ async function optimizeRoute() {
     estimateSeconds,
     steps: [
       "Geocoding addresses...",
-      "Building truck distance matrix...",
+      "Building truck travel-time matrix...",
       "Assigning stops to routes...",
       "Finalizing route order...",
     ],
@@ -626,23 +640,32 @@ async function optimizeRoute() {
     const startLabel = data.start_label || data.depot_label;
     const endLabel = data.end_label || data.depot_label;
     const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
+    const totalStops = data.routes.reduce(
+      (sum, route) => sum + route.target_stops,
+      0
+    );
+    const minutesPerStop = Math.round((data.stop_service_seconds || 0) / 60);
+
     const outputLines = [
       `Start: ${startLabel}`,
       `End: ${endLabel}`,
       "",
       `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
+      `Total time (drive + stops): ${formatDriveDuration(data.total_time_seconds)}`,
+      `  Drive time: ${formatDriveDuration(data.total_duration_seconds)}`,
+      `  Stop time: ${formatDriveDuration(data.total_service_seconds)} (${minutesPerStop} min × ${totalStops} stops)`,
       `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
     ];
 
-    if (data.split_mode === "balanced_distance") {
-      outputLines.push("Split mode: balanced by driving distance per route");
+    if (isBalancedSplitMode(data.split_mode)) {
+      outputLines.push("Split mode: balanced by total time (drive + stops) per route");
     }
 
     outputLines.push("");
 
     data.routes.forEach((route) => {
       outputLines.push(
-        `--- Route ${route.route_number} (${route.target_stops} stops, ${route.distance_miles} mi) ---`
+        `--- Route ${route.route_number} (${route.target_stops} stops · ${formatDriveDuration(route.time_seconds)} total · ${formatDriveDuration(route.duration_seconds)} drive · ${route.distance_miles} mi) ---`
       );
       outputLines.push(`Start: ${startLabel}`);
       outputLines.push(`End: ${endLabel}`);
@@ -654,7 +677,7 @@ async function optimizeRoute() {
 
     document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
     document.getElementById("optimizeDistance").textContent =
-      `${data.routes.length} routes · ${data.total_distance_miles} miles total`;
+      `${data.routes.length} routes · ${formatDriveDuration(data.total_time_seconds)} total time`;
 
     document.getElementById("resultsEmptyHint").classList.add("hidden");
     document.getElementById("optimizeDistance").classList.remove("hidden");
@@ -662,8 +685,8 @@ async function optimizeRoute() {
     document.querySelector(".results-output-label").classList.remove("hidden");
 
     const successMessage =
-      data.split_mode === "balanced_distance"
-        ? `${data.routes.length} routes optimized with balanced driving distance.`
+      isBalancedSplitMode(data.split_mode)
+        ? `${data.routes.length} routes optimized with balanced total time (drive + stops).`
         : `${data.routes.length} routes optimized successfully.`;
 
     showResultBanner(
@@ -899,9 +922,15 @@ function hasValidOptimizeEndpoints() {
 
 function getSplitMode() {
   const splitModeInput = document.getElementById("splitMode");
-  return splitModeInput?.value === "balanced_distance"
-    ? "balanced_distance"
-    : "manual";
+  const value = splitModeInput?.value;
+  if (value === "balanced_duration" || value === "balanced_distance") {
+    return "balanced_duration";
+  }
+  return "manual";
+}
+
+function isBalancedSplitMode(splitMode) {
+  return splitMode === "balanced_duration" || splitMode === "balanced_distance";
 }
 
 function getNumRoutes() {
@@ -939,7 +968,7 @@ function renderRouteCapacityInputs() {
   const numRoutes = getNumRoutes();
   numRoutesInput.value = String(numRoutes);
 
-  if (splitMode === "balanced_distance") {
+  if (splitMode === "balanced_duration") {
     container.innerHTML = "";
     updateRouteCapacitySummary();
     return;
@@ -1005,7 +1034,7 @@ function updateRouteCapacitySummary() {
     return;
   }
 
-  if (splitMode === "balanced_distance") {
+  if (splitMode === "balanced_duration") {
     if (totalStops < numRoutes) {
       summary.textContent =
         `${totalStops} stop${totalStops === 1 ? "" : "s"} for ${numRoutes} routes — ` +
@@ -1016,7 +1045,7 @@ function updateRouteCapacitySummary() {
 
     summary.textContent =
       `${totalStops} stops across ${numRoutes} routes — ` +
-      "optimizer will split stops to balance driving distance.";
+      "optimizer will split stops to balance total time (drive + 15 min/stop).";
     summary.classList.add("route-capacity-summary--match");
     return;
   }
@@ -1066,7 +1095,7 @@ function updateButtonStates() {
   const capacitiesMatch = totalStops > 0 && capacitySum === totalStops;
   const balancedReady = totalStops >= numRoutes;
   const optimizeReady =
-    splitMode === "balanced_distance" ? balancedReady : capacitiesMatch;
+    splitMode === "balanced_duration" ? balancedReady : capacitiesMatch;
   const endpointsReady = hasValidOptimizeEndpoints();
   optimizeButton.disabled =
     !optimizeHasStops || !endpointsReady || !optimizeReady;
@@ -1121,7 +1150,7 @@ function clearOptimizeInput() {
   document.getElementById("optimizeEndSameAsStart").checked = true;
   syncOptimizeEndFromStart();
   document.getElementById("numRoutes").value = "2";
-  document.getElementById("splitMode").value = "manual";
+  document.getElementById("splitMode").value = "balanced_duration";
   renderRouteCapacityInputs();
   document.getElementById("optimizeOutput").value = "";
   document.getElementById("optimizeDistance").textContent = "";
