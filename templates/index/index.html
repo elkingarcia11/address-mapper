@@ -244,7 +244,7 @@
 
           <!-- Results -->
           <section id="tab-results" class="tab-panel" role="tabpanel">
-            <div class="panel-card">
+            <div class="panel-card panel-card--results">
               <div class="panel-header">
                 <h2>Optimized Route Results</h2>
                 <p id="resultsEmptyHint" class="panel-hint">Run route optimization from the Optimize Route tab to see results here.</p>
@@ -254,6 +254,17 @@
                 <p id="optimizeDistance" class="results-distance hidden"></p>
                 <label class="section-label results-output-label hidden" for="optimizeOutput">Optimized Routes</label>
                 <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
+              </div>
+
+              <div id="optimizeResultsMapSection" class="panel-section panel-section--flush results-map-section hidden">
+                <div class="results-map-header">
+                  <label class="section-label">Route Map</label>
+                  <p id="optimizeResultsMapHint" class="panel-hint hidden">
+                    Add a Google Maps JavaScript API key on the Plot tab to view routes on the map.
+                  </p>
+                  <div id="optimizeResultsLegend" class="route-legend" aria-label="Route color legend"></div>
+                </div>
+                <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
               </div>
             </div>
           </section>

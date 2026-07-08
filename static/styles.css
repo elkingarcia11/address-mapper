@@ -759,6 +759,59 @@ textarea::placeholder {
   gap: var(--space-sm);
 }
 
+.panel-card--results {
+  gap: var(--space-md);
+}
+
+.results-map-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.results-map-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+#optimizeResultsMap {
+  width: 100%;
+  min-height: 360px;
+  height: min(52vh, 520px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.route-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.route-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.route-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  flex: 0 0 auto;
+}
+
+.route-legend__item--depot .route-legend__swatch {
+  background: #1f2937;
+}
+
 /* Spinner */
 .spinner-container {
   z-index: 1000;

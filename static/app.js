@@ -3,9 +3,25 @@ let activeInfoWindow = null;
 let mapInitialized = false;
 let googleMapsLoaded = false;
 let markers = [];
+let optimizeResultsMap = null;
+let optimizeRouteOverlays = [];
+let lastOptimizeResults = null;
 let activeTab = "convert";
 let progressIntervalId = null;
 let progressContext = null;
+
+const ROUTE_MAP_COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#9333ea",
+  "#ea580c",
+  "#0891b2",
+  "#be185d",
+  "#65a30d",
+  "#7c3aed",
+  "#c2410c",
+];
 
 function formatDriveDuration(totalSeconds) {
   const seconds = Math.max(0, Math.round(totalSeconds));
@@ -330,6 +346,19 @@ function switchTab(tabId) {
     }
   }
 
+  if (tabId === "results" && optimizeResultsMap) {
+    google.maps.event.trigger(optimizeResultsMap, "resize");
+    if (optimizeRouteOverlays.length > 0) {
+      fitOptimizeResultsMapBounds();
+    }
+  }
+
+  if (tabId === "results" && lastOptimizeResults && optimizeRouteOverlays.length === 0) {
+    renderOptimizedRoutesMap(lastOptimizeResults).catch((error) => {
+      console.error("Failed to render optimized route map:", error);
+    });
+  }
+
   clearTabBadge(tabId);
 }
 
@@ -411,7 +440,18 @@ function initMap() {
   const mapElement = document.getElementById("map");
   const spinnerContainer = document.getElementById("spinnerContainer");
 
-  map = new google.maps.Map(mapElement, {
+  map = new google.maps.Map(mapElement, getBaseMapOptions());
+
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    mapInitialized = true;
+    if (mapElement.style.display === "block") {
+      spinnerContainer.style.display = "none";
+    }
+  });
+}
+
+function getBaseMapOptions() {
+  return {
     center: { lat: 40.8448, lng: -73.8648 },
     zoom: 12,
     styles: [
@@ -430,14 +470,231 @@ function initMap() {
     streetViewControl: false,
     rotateControl: false,
     gestureHandling: "cooperative",
-  });
+  };
+}
 
-  google.maps.event.addListenerOnce(map, "idle", () => {
-    mapInitialized = true;
-    if (mapElement.style.display === "block") {
-      spinnerContainer.style.display = "none";
+function getRouteMapColor(routeNumber) {
+  return ROUTE_MAP_COLORS[(routeNumber - 1) % ROUTE_MAP_COLORS.length];
+}
+
+function clearOptimizeRouteOverlays() {
+  optimizeRouteOverlays.forEach((overlay) => overlay.setMap(null));
+  optimizeRouteOverlays = [];
+}
+
+function clearOptimizeResultsMap() {
+  clearOptimizeRouteOverlays();
+  lastOptimizeResults = null;
+
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const legend = document.getElementById("optimizeResultsLegend");
+  const hint = document.getElementById("optimizeResultsMapHint");
+
+  if (mapSection) {
+    mapSection.classList.add("hidden");
+  }
+  if (legend) {
+    legend.innerHTML = "";
+  }
+  if (hint) {
+    hint.classList.add("hidden");
+  }
+}
+
+function buildNumberedRouteMarkerIcon(color, scale = 16) {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: 2.5,
+    scale,
+    labelOrigin: new google.maps.Point(0, 0),
+  };
+}
+
+function buildRouteMarkerLabel(text) {
+  return {
+    text: String(text),
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: "700",
+  };
+}
+
+function getRouteStopLocations(route) {
+  if (!Array.isArray(route.ordered_locations) || route.ordered_locations.length < 2) {
+    return [];
+  }
+
+  return route.ordered_locations.slice(1, -1);
+}
+
+function getRoutePathCoordinates(route) {
+  if (Array.isArray(route.ordered_coordinates) && route.ordered_coordinates.length) {
+    return route.ordered_coordinates.map(([lat, lng]) => ({ lat, lng }));
+  }
+
+  if (!Array.isArray(route.ordered_locations)) {
+    return [];
+  }
+
+  return route.ordered_locations.map((location) => ({
+    lat: location.lat,
+    lng: location.lng,
+  }));
+}
+
+function fitOptimizeResultsMapBounds() {
+  if (!optimizeResultsMap || optimizeRouteOverlays.length === 0) {
+    return;
+  }
+
+  const bounds = new google.maps.LatLngBounds();
+  optimizeRouteOverlays.forEach((overlay) => {
+    if (overlay.getPosition) {
+      bounds.extend(overlay.getPosition());
+      return;
+    }
+    if (overlay.getPath) {
+      overlay.getPath().forEach((latLng) => bounds.extend(latLng));
     }
   });
+  optimizeResultsMap.fitBounds(bounds, 48);
+}
+
+function renderOptimizeResultsLegend(data) {
+  const legend = document.getElementById("optimizeResultsLegend");
+  if (!legend) {
+    return;
+  }
+
+  const items = [
+    `<span class="route-legend__item route-legend__item--depot"><span class="route-legend__swatch"></span>Start / End</span>`,
+  ];
+
+  data.routes.forEach((route) => {
+    const color = getRouteMapColor(route.route_number);
+    items.push(
+      `<span class="route-legend__item"><span class="route-legend__swatch" style="background:${color}"></span>Route ${route.route_number} (${route.target_stops} stops)</span>`
+    );
+  });
+
+  legend.innerHTML = items.join("");
+}
+
+async function renderOptimizedRoutesMap(data) {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const mapHint = document.getElementById("optimizeResultsMapHint");
+  if (!mapSection) {
+    return;
+  }
+
+  lastOptimizeResults = data;
+  mapSection.classList.remove("hidden");
+  renderOptimizeResultsLegend(data);
+
+  if (!validateApiKeys(["googleMapsJs"])) {
+    if (mapHint) {
+      mapHint.classList.remove("hidden");
+    }
+    return;
+  }
+
+  if (mapHint) {
+    mapHint.classList.add("hidden");
+  }
+
+  await loadGoogleMapsIfNeeded();
+
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!optimizeResultsMap) {
+    optimizeResultsMap = new google.maps.Map(mapElement, getBaseMapOptions());
+  }
+
+  clearOptimizeRouteOverlays();
+
+  const depot = data.depot;
+  if (depot?.lat != null && depot?.lng != null) {
+    const depotMarker = new google.maps.Marker({
+      position: { lat: depot.lat, lng: depot.lng },
+      map: optimizeResultsMap,
+      title: depot.label || data.depot_label || "Start / End",
+      label: buildRouteMarkerLabel("S/E"),
+      icon: buildNumberedRouteMarkerIcon("#1f2937", 18),
+      zIndex: 1000,
+    });
+
+    const depotInfo = new google.maps.InfoWindow({
+      content: `<strong>Start / End</strong><br>${escapeHtml(
+        depot.label || data.depot_label || "Depot"
+      )}`,
+    });
+
+    depotMarker.addListener("click", () => {
+      if (activeInfoWindow) {
+        activeInfoWindow.close();
+      }
+      depotInfo.open(optimizeResultsMap, depotMarker);
+      activeInfoWindow = depotInfo;
+    });
+
+    optimizeRouteOverlays.push(depotMarker);
+  }
+
+  data.routes.forEach((route) => {
+    const color = getRouteMapColor(route.route_number);
+    const path = getRoutePathCoordinates(route);
+
+    if (path.length > 1) {
+      const polyline = new google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: color,
+        strokeOpacity: 0.9,
+        strokeWeight: 4,
+        map: optimizeResultsMap,
+      });
+      optimizeRouteOverlays.push(polyline);
+    }
+
+    const stopLocations = getRouteStopLocations(route);
+
+    stopLocations.forEach((location, index) => {
+      if (!location || location.lat == null || location.lng == null) {
+        return;
+      }
+
+      const stopNumber = index + 1;
+      const label = route.ordered_stop_labels?.[index] || location.label || `Stop ${stopNumber}`;
+
+      const marker = new google.maps.Marker({
+        position: { lat: location.lat, lng: location.lng },
+        map: optimizeResultsMap,
+        title: `Route ${route.route_number} · Stop ${stopNumber}: ${label}`,
+        label: buildRouteMarkerLabel(stopNumber),
+        icon: buildNumberedRouteMarkerIcon(color, 16),
+        zIndex: 100 + stopNumber,
+      });
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: `<strong>Route ${route.route_number} · Stop ${stopNumber}</strong><br>${escapeHtml(label)}`,
+      });
+
+      marker.addListener("click", () => {
+        if (activeInfoWindow) {
+          activeInfoWindow.close();
+        }
+        infoWindow.open(optimizeResultsMap, marker);
+        activeInfoWindow = infoWindow;
+      });
+
+      optimizeRouteOverlays.push(marker);
+    });
+  });
+
+  google.maps.event.trigger(optimizeResultsMap, "resize");
+  fitOptimizeResultsMapBounds();
 }
 
 function escapeHtml(text) {
@@ -683,6 +940,12 @@ async function optimizeRoute() {
     document.getElementById("optimizeDistance").classList.remove("hidden");
     document.getElementById("optimizeOutput").classList.remove("hidden");
     document.querySelector(".results-output-label").classList.remove("hidden");
+
+    try {
+      await renderOptimizedRoutesMap(data);
+    } catch (mapError) {
+      console.error("Failed to render optimized route map:", mapError);
+    }
 
     const successMessage =
       isBalancedSplitMode(data.split_mode)
@@ -1158,6 +1421,7 @@ function clearOptimizeInput() {
   document.getElementById("optimizeOutput").classList.add("hidden");
   document.querySelector(".results-output-label").classList.add("hidden");
   document.getElementById("resultsEmptyHint").classList.remove("hidden");
+  clearOptimizeResultsMap();
   hideResultBanner("optimizeResultBanner");
   clearTabBadge("results");
   savePersistedSettings();

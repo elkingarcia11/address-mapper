@@ -318,6 +318,7 @@ def optimize_route_endpoint():
                 "target_stops": route["target_stops"],
                 "ordered_stop_labels": route["ordered_stop_labels"],
                 "ordered_locations": route["ordered_locations"],
+                "ordered_coordinates": route["ordered_coordinates"],
                 "distance_meters": route["distance_meters"],
                 "distance_miles": round(route["distance_meters"] / 1609.344, 2),
                 "duration_seconds": route["duration_seconds"],
