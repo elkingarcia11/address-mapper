@@ -175,25 +175,26 @@
                 <h3 class="section-label">Route Configuration</h3>
                 <div class="field-grid field-grid--compact">
                   <div class="field-group">
-                    <label for="numRoutes">Number of routes</label>
+                    <label for="numRoutes">Number of routes (trucks)</label>
                     <input type="number" id="numRoutes" min="1" max="50" value="2" />
                   </div>
                   <div class="field-group">
                     <label for="splitMode">Stop assignment</label>
                     <select id="splitMode">
+                      <option value="balanced_duration" selected>Balance routes by total time (drive + stops)</option>
                       <option value="manual">Specify stops per route</option>
-                      <option value="balanced_distance">Balance routes by distance</option>
                     </select>
                   </div>
                   <div class="field-group field-group--full">
                     <label for="truckRouteMode">Truck routing</label>
                     <select id="truckRouteMode">
-                      <option value="local_delivery">Local truck routes (deliveries)</option>
-                      <option value="cross_city">Through truck routes (cross-city)</option>
+                      <option value="cross_city" selected>Through truck routes (cross-borough / highways)</option>
+                      <option value="local_delivery">Local truck routes (last-mile deliveries)</option>
                     </select>
                     <p class="field-hint">
-                      Routes use the HGV driving profile and only roads suitable for trucks,
-                      including allowed bridge crossings within standard weight and height limits.
+                      Routes use the HGV driving profile on truck-legal roads, including highways
+                      and permitted bridge/tunnel crossings between boroughs, within standard truck
+                      weight and height limits. Parkways and other truck-restricted roads are avoided.
                     </p>
                   </div>
                 </div>
@@ -243,7 +244,7 @@
 
           <!-- Results -->
           <section id="tab-results" class="tab-panel" role="tabpanel">
-            <div class="panel-card">
+            <div class="panel-card panel-card--results">
               <div class="panel-header">
                 <h2>Optimized Route Results</h2>
                 <p id="resultsEmptyHint" class="panel-hint">Run route optimization from the Optimize Route tab to see results here.</p>
@@ -267,6 +268,17 @@
                   Reverse stop order on every route (1 becomes last, last becomes 1). Start and end stay the same.
                 </p>
                 <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
+              </div>
+
+              <div id="optimizeResultsMapSection" class="panel-section panel-section--flush results-map-section hidden">
+                <div class="results-map-header">
+                  <label class="section-label">Route Map</label>
+                  <p id="optimizeResultsMapHint" class="panel-hint hidden">
+                    Add a Google Maps JavaScript API key on the Plot tab to view routes on the map.
+                  </p>
+                  <div id="optimizeResultsLegend" class="route-legend" aria-label="Route color legend"></div>
+                </div>
+                <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
               </div>
             </div>
           </section>

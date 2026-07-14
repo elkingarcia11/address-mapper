@@ -12,6 +12,7 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 ORS_MATRIX_PAIR_LIMIT = 3500
 DEFAULT_ORS_CHUNK_SIZE = 50
+DEFAULT_STOP_SERVICE_SECONDS = 15 * 60
 DEFAULT_TRUCK_PROFILE = "driving-hgv"
 VALID_TRUCK_ROUTE_MODES = frozenset({"local_delivery", "cross_city"})
 DEFAULT_TRUCK_ROUTE_MODE = "local_delivery"
@@ -108,17 +109,18 @@ def build_truck_routing_options(truck_route_mode: str) -> dict:
     }
 
 
-def build_distance_matrix_ors(
+def build_route_matrices_ors(
     locations: Sequence[Location],
     *,
     api_key: str,
     profile: str = DEFAULT_TRUCK_PROFILE,
     truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
-) -> list[list[int]]:
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Build road distance (meters) and duration (seconds) matrices via ORS."""
     n = len(locations)
     if n == 0:
-        return []
+        return [], []
 
     if chunk_size * chunk_size > ORS_MATRIX_PAIR_LIMIT:
         raise ValueError(
@@ -127,7 +129,8 @@ def build_distance_matrix_ors(
         )
 
     ors_locations = [loc.to_ors() for loc in locations]
-    matrix = [[0] * n for _ in range(n)]
+    distance_matrix = [[0] * n for _ in range(n)]
+    duration_matrix = [[0] * n for _ in range(n)]
     client = openrouteservice.Client(key=api_key, timeout=300)
     routing_options = build_truck_routing_options(truck_route_mode)
 
@@ -149,19 +152,54 @@ def build_distance_matrix_ors(
                     "locations": ors_locations,
                     "sources": sources,
                     "destinations": destinations,
-                    "metrics": ["distance"],
+                    "metrics": ["distance", "duration"],
                     "units": "m",
                     "options": routing_options,
                 },
             )
             distances = response["distances"]
+            durations = response["durations"]
             for i, src_idx in enumerate(sources):
                 for j, dst_idx in enumerate(destinations):
-                    matrix[src_idx][dst_idx] = _ors_distance_to_int(
+                    distance_matrix[src_idx][dst_idx] = _ors_distance_to_int(
                         distances[i][j], src_idx, dst_idx
                     )
+                    duration_matrix[src_idx][dst_idx] = _ors_distance_to_int(
+                        durations[i][j], src_idx, dst_idx
+                    )
 
-    return matrix
+    return distance_matrix, duration_matrix
+
+
+def build_distance_matrix_ors(
+    locations: Sequence[Location],
+    *,
+    api_key: str,
+    profile: str = DEFAULT_TRUCK_PROFILE,
+    truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
+    chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
+) -> list[list[int]]:
+    distance_matrix, _ = build_route_matrices_ors(
+        locations,
+        api_key=api_key,
+        profile=profile,
+        truck_route_mode=truck_route_mode,
+        chunk_size=chunk_size,
+    )
+    return distance_matrix
+
+
+def _route_leg_totals(
+    ordered_indices: Sequence[int],
+    distance_matrix: list[list[int]],
+    duration_matrix: list[list[int]],
+) -> tuple[int, int]:
+    total_distance = 0
+    total_duration = 0
+    for left, right in zip(ordered_indices, ordered_indices[1:]):
+        total_distance += distance_matrix[left][right]
+        total_duration += duration_matrix[left][right]
+    return total_distance, total_duration
 
 
 def compute_vrp_time_limit(
@@ -175,17 +213,18 @@ def compute_vrp_time_limit(
     return min(maximum, max(minimum, 15 + num_stops + num_routes * 10))
 
 
-def _max_route_distance_cap(
-    distance_matrix: list[list[int]],
+def _max_route_cost_cap(
+    cost_matrix: list[list[int]],
     max_stops_on_route: int,
+    service_seconds: int = 0,
 ) -> int:
     max_leg = max(
-        distance_matrix[i][j]
-        for i in range(len(distance_matrix))
-        for j in range(len(distance_matrix))
+        cost_matrix[i][j]
+        for i in range(len(cost_matrix))
+        for j in range(len(cost_matrix))
         if i != j
     )
-    return max_leg * (max_stops_on_route + 2)
+    return (max_leg + service_seconds) * (max_stops_on_route + 2)
 
 
 def _solve_routing_model(
@@ -230,18 +269,21 @@ def optimize_route(
     truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     time_limit_seconds: int = 5,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
+    stop_service_seconds: int = DEFAULT_STOP_SERVICE_SECONDS,
 ) -> dict:
     locations = [start, *stops, end]
 
     if len(locations) == 2:
-        distance_matrix = build_distance_matrix_ors(
+        distance_matrix, duration_matrix = build_route_matrices_ors(
             locations,
             api_key=api_key,
             profile=profile,
             truck_route_mode=truck_route_mode,
             chunk_size=ors_chunk_size,
         )
-        total_distance = distance_matrix[0][1]
+        total_distance, total_duration = _route_leg_totals(
+            [0, 1], distance_matrix, duration_matrix
+        )
         ordered_locations = [start.to_dict(), end.to_dict()]
         return {
             "ordered_locations": ordered_locations,
@@ -252,12 +294,17 @@ def optimize_route(
             "ordered_indices": [0, 1],
             "stop_order": [],
             "total_distance_meters": total_distance,
+            "total_duration_seconds": total_duration,
+            "total_service_seconds": 0,
+            "total_time_seconds": total_duration,
+            "stop_service_seconds": stop_service_seconds,
+            "optimization_metric": "total_time",
             "distance_source": "openrouteservice",
             "profile": profile,
             "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
         }
 
-    distance_matrix = build_distance_matrix_ors(
+    distance_matrix, duration_matrix = build_route_matrices_ors(
         locations,
         api_key=api_key,
         profile=profile,
@@ -276,12 +323,14 @@ def optimize_route(
     )
     routing = pywrapcp.RoutingModel(manager)
 
-    def distance_callback(from_index: int, to_index: int) -> int:
+    def time_callback(from_index: int, to_index: int) -> int:
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return distance_matrix[from_node][to_node]
+        travel = duration_matrix[from_node][to_node]
+        service = stop_service_seconds if to_node != end_index else 0
+        return travel + service
 
-    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    transit_callback_index = routing.RegisterTransitCallback(time_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
@@ -299,16 +348,16 @@ def optimize_route(
 
     ordered_indices: list[int] = []
     index = routing.Start(0)
-    total_distance = 0
 
     while not routing.IsEnd(index):
         node = manager.IndexToNode(index)
         ordered_indices.append(node)
-        previous = index
         index = solution.Value(routing.NextVar(index))
-        total_distance += routing.GetArcCostForVehicle(previous, index, 0)
 
     ordered_indices.append(manager.IndexToNode(index))
+    total_distance, total_duration = _route_leg_totals(
+        ordered_indices, distance_matrix, duration_matrix
+    )
 
     ordered_coordinates = [
         [locations[i].lat, locations[i].lng] for i in ordered_indices
@@ -316,12 +365,20 @@ def optimize_route(
     ordered_locations = [locations[i].to_dict() for i in ordered_indices]
     stop_order = [i - 1 for i in ordered_indices if 0 < i < end_index]
 
+    total_service = len(stop_order) * stop_service_seconds
+    total_time = total_duration + total_service
+
     return {
         "ordered_locations": ordered_locations,
         "ordered_coordinates": ordered_coordinates,
         "ordered_indices": ordered_indices,
         "stop_order": stop_order,
         "total_distance_meters": total_distance,
+        "total_duration_seconds": total_duration,
+        "total_service_seconds": total_service,
+        "total_time_seconds": total_time,
+        "stop_service_seconds": stop_service_seconds,
+        "optimization_metric": "total_time",
         "distance_source": "openrouteservice",
         "profile": profile,
         "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
@@ -338,9 +395,11 @@ def optimize_multi_route(
     truck_route_mode: str = DEFAULT_TRUCK_ROUTE_MODE,
     time_limit_seconds: int = 30,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
+    stop_service_seconds: int = DEFAULT_STOP_SERVICE_SECONDS,
 ) -> dict:
-    """Split stops across multiple routes from a shared depot, minimizing total distance.
+    """Split stops across multiple routes from a shared depot, minimizing total time.
 
+    Total time per route is drive time plus a fixed service time per stop.
     Every route starts and ends at the same depot location.
     """
     if not route_capacities:
@@ -357,7 +416,7 @@ def optimize_multi_route(
     locations = [depot, *stops]
     depot_index = 0
 
-    distance_matrix = build_distance_matrix_ors(
+    distance_matrix, duration_matrix = build_route_matrices_ors(
         locations,
         api_key=api_key,
         profile=profile,
@@ -372,12 +431,12 @@ def optimize_multi_route(
     )
     routing = pywrapcp.RoutingModel(manager)
 
-    def distance_callback(from_index: int, to_index: int) -> int:
+    def duration_callback(from_index: int, to_index: int) -> int:
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return distance_matrix[from_node][to_node]
+        return duration_matrix[from_node][to_node]
 
-    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    transit_callback_index = routing.RegisterTransitCallback(duration_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
     def stop_demand_callback(from_index: int) -> int:
@@ -411,25 +470,29 @@ def optimize_multi_route(
 
     routes: list[dict] = []
     total_distance = 0
+    total_duration = 0
+    total_service = 0
 
     for vehicle_id in range(num_routes):
         ordered_indices: list[int] = []
-        route_distance = 0
         index = routing.Start(vehicle_id)
 
         while not routing.IsEnd(index):
             node = manager.IndexToNode(index)
             ordered_indices.append(node)
-            previous = index
             index = solution.Value(routing.NextVar(index))
-            route_distance += routing.GetArcCostForVehicle(
-                previous, index, vehicle_id
-            )
 
         ordered_indices.append(manager.IndexToNode(index))
+        route_distance, route_duration = _route_leg_totals(
+            ordered_indices, distance_matrix, duration_matrix
+        )
         total_distance += route_distance
+        total_duration += route_duration
 
         stop_indices = [i for i in ordered_indices if i != depot_index]
+        route_service = len(stop_indices) * stop_service_seconds
+        route_time = route_duration + route_service
+        total_service += route_service
         routes.append({
             "route_number": vehicle_id + 1,
             "target_stops": route_capacities[vehicle_id],
@@ -442,6 +505,9 @@ def optimize_multi_route(
             "stop_order": [i - 1 for i in stop_indices],
             "ordered_stop_labels": [locations[i].label for i in stop_indices],
             "distance_meters": route_distance,
+            "duration_seconds": route_duration,
+            "service_seconds": route_service,
+            "time_seconds": route_time,
         })
 
     return {
@@ -450,6 +516,11 @@ def optimize_multi_route(
         "route_capacities": list(route_capacities),
         "split_mode": "manual",
         "total_distance_meters": total_distance,
+        "total_duration_seconds": total_duration,
+        "total_service_seconds": total_service,
+        "total_time_seconds": total_duration + total_service,
+        "stop_service_seconds": stop_service_seconds,
+        "optimization_metric": "total_time",
         "distance_source": "openrouteservice",
         "profile": profile,
         "truck_route_mode": normalize_truck_route_mode(truck_route_mode),
@@ -467,10 +538,13 @@ def optimize_balanced_multi_route(
     time_limit_seconds: int = 30,
     ors_chunk_size: int = DEFAULT_ORS_CHUNK_SIZE,
     balance_weight: int = 100,
+    stop_service_seconds: int = DEFAULT_STOP_SERVICE_SECONDS,
 ) -> dict:
-    """Split stops across routes from a shared depot, balancing driving distance per route.
+    """Split stops across routes from a shared depot, balancing total time per route.
 
-    Every route starts and ends at the same depot location.
+    Total time is drive time plus a fixed service time per stop. Stops are
+    assigned to minimize the combined total time while keeping each route's
+    total time as equal as possible. Every route starts and ends at the depot.
     """
     if num_routes < 1:
         raise ValueError("At least one route is required.")
@@ -485,7 +559,7 @@ def optimize_balanced_multi_route(
     locations = [depot, *stops]
     depot_index = 0
 
-    distance_matrix = build_distance_matrix_ors(
+    distance_matrix, duration_matrix = build_route_matrices_ors(
         locations,
         api_key=api_key,
         profile=profile,
@@ -500,24 +574,28 @@ def optimize_balanced_multi_route(
     )
     routing = pywrapcp.RoutingModel(manager)
 
-    def distance_callback(from_index: int, to_index: int) -> int:
+    def time_callback(from_index: int, to_index: int) -> int:
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return distance_matrix[from_node][to_node]
+        travel = duration_matrix[from_node][to_node]
+        service = stop_service_seconds if to_node != depot_index else 0
+        return travel + service
 
-    transit_callback_index = routing.RegisterTransitCallback(distance_callback)
+    transit_callback_index = routing.RegisterTransitCallback(time_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
-    max_route_distance = _max_route_distance_cap(distance_matrix, len(stops))
+    max_route_time = _max_route_cost_cap(
+        duration_matrix, len(stops), service_seconds=stop_service_seconds
+    )
     routing.AddDimension(
         transit_callback_index,
         0,
-        max_route_distance,
+        max_route_time,
         True,
-        "Distance",
+        "Time",
     )
-    distance_dimension = routing.GetDimensionOrDie("Distance")
-    distance_dimension.SetGlobalSpanCostCoefficient(balance_weight)
+    time_dimension = routing.GetDimensionOrDie("Time")
+    time_dimension.SetGlobalSpanCostCoefficient(balance_weight)
 
     def stop_demand_callback(from_index: int) -> int:
         from_node = manager.IndexToNode(from_index)
@@ -549,25 +627,29 @@ def optimize_balanced_multi_route(
 
     routes: list[dict] = []
     total_distance = 0
+    total_duration = 0
+    total_service = 0
 
     for vehicle_id in range(num_routes):
         ordered_indices: list[int] = []
-        route_distance = 0
         index = routing.Start(vehicle_id)
 
         while not routing.IsEnd(index):
             node = manager.IndexToNode(index)
             ordered_indices.append(node)
-            previous = index
             index = solution.Value(routing.NextVar(index))
-            route_distance += routing.GetArcCostForVehicle(
-                previous, index, vehicle_id
-            )
 
         ordered_indices.append(manager.IndexToNode(index))
+        route_distance, route_duration = _route_leg_totals(
+            ordered_indices, distance_matrix, duration_matrix
+        )
         total_distance += route_distance
+        total_duration += route_duration
 
         stop_indices = [i for i in ordered_indices if i != depot_index]
+        route_service = len(stop_indices) * stop_service_seconds
+        route_time = route_duration + route_service
+        total_service += route_service
         routes.append({
             "route_number": vehicle_id + 1,
             "target_stops": len(stop_indices),
@@ -580,15 +662,23 @@ def optimize_balanced_multi_route(
             "stop_order": [i - 1 for i in stop_indices],
             "ordered_stop_labels": [locations[i].label for i in stop_indices],
             "distance_meters": route_distance,
+            "duration_seconds": route_duration,
+            "service_seconds": route_service,
+            "time_seconds": route_time,
         })
 
     return {
         "depot": depot.to_dict(),
         "routes": routes,
         "route_capacities": [route["target_stops"] for route in routes],
-        "split_mode": "balanced_distance",
+        "split_mode": "balanced_duration",
         "num_routes": num_routes,
         "total_distance_meters": total_distance,
+        "total_duration_seconds": total_duration,
+        "total_service_seconds": total_service,
+        "total_time_seconds": total_duration + total_service,
+        "stop_service_seconds": stop_service_seconds,
+        "optimization_metric": "total_time",
         "distance_source": "openrouteservice",
         "profile": profile,
         "truck_route_mode": normalize_truck_route_mode(truck_route_mode),

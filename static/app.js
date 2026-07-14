@@ -3,9 +3,39 @@ let activeInfoWindow = null;
 let mapInitialized = false;
 let googleMapsLoaded = false;
 let markers = [];
+let optimizeResultsMap = null;
+let optimizeRouteOverlays = [];
+let lastOptimizeResults = null;
 let activeTab = "convert";
 let progressIntervalId = null;
 let progressContext = null;
+
+const ROUTE_MAP_COLORS = [
+  "#2563eb",
+  "#dc2626",
+  "#16a34a",
+  "#9333ea",
+  "#ea580c",
+  "#0891b2",
+  "#be185d",
+  "#65a30d",
+  "#7c3aed",
+  "#c2410c",
+];
+
+function formatDriveDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${remainingSeconds}s`;
+}
 
 function formatElapsedDuration(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -316,6 +346,19 @@ function switchTab(tabId) {
     }
   }
 
+  if (tabId === "results" && optimizeResultsMap) {
+    google.maps.event.trigger(optimizeResultsMap, "resize");
+    if (optimizeRouteOverlays.length > 0) {
+      fitOptimizeResultsMapBounds();
+    }
+  }
+
+  if (tabId === "results" && lastOptimizeResults && optimizeRouteOverlays.length === 0) {
+    renderOptimizedRoutesMap(lastOptimizeResults).catch((error) => {
+      console.error("Failed to render optimized route map:", error);
+    });
+  }
+
   clearTabBadge(tabId);
 }
 
@@ -397,7 +440,18 @@ function initMap() {
   const mapElement = document.getElementById("map");
   const spinnerContainer = document.getElementById("spinnerContainer");
 
-  map = new google.maps.Map(mapElement, {
+  map = new google.maps.Map(mapElement, getBaseMapOptions());
+
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    mapInitialized = true;
+    if (mapElement.style.display === "block") {
+      spinnerContainer.style.display = "none";
+    }
+  });
+}
+
+function getBaseMapOptions() {
+  return {
     center: { lat: 40.8448, lng: -73.8648 },
     zoom: 12,
     styles: [
@@ -416,14 +470,231 @@ function initMap() {
     streetViewControl: false,
     rotateControl: false,
     gestureHandling: "cooperative",
-  });
+  };
+}
 
-  google.maps.event.addListenerOnce(map, "idle", () => {
-    mapInitialized = true;
-    if (mapElement.style.display === "block") {
-      spinnerContainer.style.display = "none";
+function getRouteMapColor(routeNumber) {
+  return ROUTE_MAP_COLORS[(routeNumber - 1) % ROUTE_MAP_COLORS.length];
+}
+
+function clearOptimizeRouteOverlays() {
+  optimizeRouteOverlays.forEach((overlay) => overlay.setMap(null));
+  optimizeRouteOverlays = [];
+}
+
+function clearOptimizeResultsMap() {
+  clearOptimizeRouteOverlays();
+  lastOptimizeResults = null;
+
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const legend = document.getElementById("optimizeResultsLegend");
+  const hint = document.getElementById("optimizeResultsMapHint");
+
+  if (mapSection) {
+    mapSection.classList.add("hidden");
+  }
+  if (legend) {
+    legend.innerHTML = "";
+  }
+  if (hint) {
+    hint.classList.add("hidden");
+  }
+}
+
+function buildNumberedRouteMarkerIcon(color, scale = 16) {
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: 2.5,
+    scale,
+    labelOrigin: new google.maps.Point(0, 0),
+  };
+}
+
+function buildRouteMarkerLabel(text) {
+  return {
+    text: String(text),
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: "700",
+  };
+}
+
+function getRouteStopLocations(route) {
+  if (!Array.isArray(route.ordered_locations) || route.ordered_locations.length < 2) {
+    return [];
+  }
+
+  return route.ordered_locations.slice(1, -1);
+}
+
+function getRoutePathCoordinates(route) {
+  if (Array.isArray(route.ordered_coordinates) && route.ordered_coordinates.length) {
+    return route.ordered_coordinates.map(([lat, lng]) => ({ lat, lng }));
+  }
+
+  if (!Array.isArray(route.ordered_locations)) {
+    return [];
+  }
+
+  return route.ordered_locations.map((location) => ({
+    lat: location.lat,
+    lng: location.lng,
+  }));
+}
+
+function fitOptimizeResultsMapBounds() {
+  if (!optimizeResultsMap || optimizeRouteOverlays.length === 0) {
+    return;
+  }
+
+  const bounds = new google.maps.LatLngBounds();
+  optimizeRouteOverlays.forEach((overlay) => {
+    if (overlay.getPosition) {
+      bounds.extend(overlay.getPosition());
+      return;
+    }
+    if (overlay.getPath) {
+      overlay.getPath().forEach((latLng) => bounds.extend(latLng));
     }
   });
+  optimizeResultsMap.fitBounds(bounds, 48);
+}
+
+function renderOptimizeResultsLegend(data) {
+  const legend = document.getElementById("optimizeResultsLegend");
+  if (!legend) {
+    return;
+  }
+
+  const items = [
+    `<span class="route-legend__item route-legend__item--depot"><span class="route-legend__swatch"></span>Start / End</span>`,
+  ];
+
+  data.routes.forEach((route) => {
+    const color = getRouteMapColor(route.route_number);
+    items.push(
+      `<span class="route-legend__item"><span class="route-legend__swatch" style="background:${color}"></span>Route ${route.route_number} (${route.target_stops} stops)</span>`
+    );
+  });
+
+  legend.innerHTML = items.join("");
+}
+
+async function renderOptimizedRoutesMap(data) {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const mapHint = document.getElementById("optimizeResultsMapHint");
+  if (!mapSection) {
+    return;
+  }
+
+  lastOptimizeResults = data;
+  mapSection.classList.remove("hidden");
+  renderOptimizeResultsLegend(data);
+
+  if (!validateApiKeys(["googleMapsJs"])) {
+    if (mapHint) {
+      mapHint.classList.remove("hidden");
+    }
+    return;
+  }
+
+  if (mapHint) {
+    mapHint.classList.add("hidden");
+  }
+
+  await loadGoogleMapsIfNeeded();
+
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!optimizeResultsMap) {
+    optimizeResultsMap = new google.maps.Map(mapElement, getBaseMapOptions());
+  }
+
+  clearOptimizeRouteOverlays();
+
+  const depot = data.depot;
+  if (depot?.lat != null && depot?.lng != null) {
+    const depotMarker = new google.maps.Marker({
+      position: { lat: depot.lat, lng: depot.lng },
+      map: optimizeResultsMap,
+      title: depot.label || data.depot_label || "Start / End",
+      label: buildRouteMarkerLabel("S/E"),
+      icon: buildNumberedRouteMarkerIcon("#1f2937", 18),
+      zIndex: 1000,
+    });
+
+    const depotInfo = new google.maps.InfoWindow({
+      content: `<strong>Start / End</strong><br>${escapeHtml(
+        depot.label || data.depot_label || "Depot"
+      )}`,
+    });
+
+    depotMarker.addListener("click", () => {
+      if (activeInfoWindow) {
+        activeInfoWindow.close();
+      }
+      depotInfo.open(optimizeResultsMap, depotMarker);
+      activeInfoWindow = depotInfo;
+    });
+
+    optimizeRouteOverlays.push(depotMarker);
+  }
+
+  data.routes.forEach((route) => {
+    const color = getRouteMapColor(route.route_number);
+    const path = getRoutePathCoordinates(route);
+
+    if (path.length > 1) {
+      const polyline = new google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: color,
+        strokeOpacity: 0.9,
+        strokeWeight: 4,
+        map: optimizeResultsMap,
+      });
+      optimizeRouteOverlays.push(polyline);
+    }
+
+    const stopLocations = getRouteStopLocations(route);
+
+    stopLocations.forEach((location, index) => {
+      if (!location || location.lat == null || location.lng == null) {
+        return;
+      }
+
+      const stopNumber = index + 1;
+      const label = route.ordered_stop_labels?.[index] || location.label || `Stop ${stopNumber}`;
+
+      const marker = new google.maps.Marker({
+        position: { lat: location.lat, lng: location.lng },
+        map: optimizeResultsMap,
+        title: `Route ${route.route_number} · Stop ${stopNumber}: ${label}`,
+        label: buildRouteMarkerLabel(stopNumber),
+        icon: buildNumberedRouteMarkerIcon(color, 16),
+        zIndex: 100 + stopNumber,
+      });
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: `<strong>Route ${route.route_number} · Stop ${stopNumber}</strong><br>${escapeHtml(label)}`,
+      });
+
+      marker.addListener("click", () => {
+        if (activeInfoWindow) {
+          activeInfoWindow.close();
+        }
+        infoWindow.open(optimizeResultsMap, marker);
+        activeInfoWindow = infoWindow;
+      });
+
+      optimizeRouteOverlays.push(marker);
+    });
+  });
+
+  google.maps.event.trigger(optimizeResultsMap, "resize");
+  fitOptimizeResultsMapBounds();
 }
 
 function escapeHtml(text) {
@@ -591,7 +862,7 @@ async function optimizeRoute() {
     estimateSeconds,
     steps: [
       "Geocoding addresses...",
-      "Building truck distance matrix...",
+      "Building truck travel-time matrix...",
       "Assigning stops to routes...",
       "Finalizing route order...",
     ],
@@ -627,18 +898,24 @@ async function optimizeRoute() {
     const endLabel = data.end_label || data.depot_label;
     const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
 
-    lastOptimizeResult = {
+    lastOptimizeResults = {
       ...data,
       start_label: startLabel,
       end_label: endLabel,
       truck_route_mode: truckRouteMode,
       route_order_flipped: false,
     };
-    renderOptimizeResults(lastOptimizeResult);
+    renderOptimizeResults(lastOptimizeResults);
+
+    try {
+      await renderOptimizedRoutesMap(lastOptimizeResults);
+    } catch (mapError) {
+      console.error("Failed to render optimized route map:", mapError);
+    }
 
     const successMessage =
-      data.split_mode === "balanced_distance"
-        ? `${data.routes.length} routes optimized with balanced driving distance.`
+      isBalancedSplitMode(data.split_mode)
+        ? `${data.routes.length} routes optimized with balanced total time (drive + stops).`
         : `${data.routes.length} routes optimized successfully.`;
 
     showResultBanner(
@@ -657,8 +934,6 @@ async function optimizeRoute() {
   }
 }
 
-let lastOptimizeResult = null;
-
 function renderOptimizeResults(data) {
   if (!data?.routes?.length) {
     return;
@@ -668,16 +943,25 @@ function renderOptimizeResults(data) {
   const endLabel = data.end_label || data.depot_label;
   const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
   const flipped = Boolean(data.route_order_flipped);
+  const totalStops = data.routes.reduce(
+    (sum, route) => sum + route.target_stops,
+    0
+  );
+  const minutesPerStop = Math.round((data.stop_service_seconds || 0) / 60);
+
   const outputLines = [
     `Start: ${startLabel}`,
     `End: ${endLabel}`,
     "",
     `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
+    `Total time (drive + stops): ${formatDriveDuration(data.total_time_seconds)}`,
+    `  Drive time: ${formatDriveDuration(data.total_duration_seconds)}`,
+    `  Stop time: ${formatDriveDuration(data.total_service_seconds)} (${minutesPerStop} min × ${totalStops} stops)`,
     `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
   ];
 
-  if (data.split_mode === "balanced_distance") {
-    outputLines.push("Split mode: balanced by driving distance per route");
+  if (isBalancedSplitMode(data.split_mode)) {
+    outputLines.push("Split mode: balanced by total time (drive + stops) per route");
   }
   if (flipped) {
     outputLines.push("Stop order: reversed (flipped)");
@@ -687,7 +971,7 @@ function renderOptimizeResults(data) {
 
   data.routes.forEach((route) => {
     outputLines.push(
-      `--- Route ${route.route_number} (${route.target_stops} stops, ${route.distance_miles} mi) ---`
+      `--- Route ${route.route_number} (${route.target_stops} stops · ${formatDriveDuration(route.time_seconds)} total · ${formatDriveDuration(route.duration_seconds)} drive · ${route.distance_miles} mi) ---`
     );
     outputLines.push(`Start: ${startLabel}`);
     outputLines.push(`End: ${endLabel}`);
@@ -699,7 +983,7 @@ function renderOptimizeResults(data) {
 
   document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
   document.getElementById("optimizeDistance").textContent =
-    `${data.routes.length} routes · ${data.total_distance_miles} miles total` +
+    `${data.routes.length} routes · ${formatDriveDuration(data.total_time_seconds)} total time` +
     (flipped ? " · order flipped" : "");
 
   document.getElementById("resultsEmptyHint").classList.add("hidden");
@@ -713,24 +997,37 @@ function renderOptimizeResults(data) {
   flipButton.textContent = flipped ? "Restore Original Order" : "Flip Order";
 }
 
+function reverseRouteMiddle(items) {
+  if (!Array.isArray(items) || items.length < 3) {
+    return Array.isArray(items) ? [...items] : items;
+  }
+  const middle = items.slice(1, -1).reverse();
+  return [items[0], ...middle, items[items.length - 1]];
+}
+
 function flipOptimizeRouteOrder() {
-  if (!lastOptimizeResult?.routes?.length) {
+  if (!lastOptimizeResults?.routes?.length) {
     return;
   }
 
-  lastOptimizeResult = {
-    ...lastOptimizeResult,
-    route_order_flipped: !lastOptimizeResult.route_order_flipped,
-    routes: lastOptimizeResult.routes.map((route) => ({
+  lastOptimizeResults = {
+    ...lastOptimizeResults,
+    route_order_flipped: !lastOptimizeResults.route_order_flipped,
+    routes: lastOptimizeResults.routes.map((route) => ({
       ...route,
-      ordered_stop_labels: [...route.ordered_stop_labels].reverse(),
+      ordered_stop_labels: [...(route.ordered_stop_labels || [])].reverse(),
+      ordered_locations: reverseRouteMiddle(route.ordered_locations),
+      ordered_coordinates: reverseRouteMiddle(route.ordered_coordinates),
     })),
   };
 
-  renderOptimizeResults(lastOptimizeResult);
+  renderOptimizeResults(lastOptimizeResults);
+  renderOptimizedRoutesMap(lastOptimizeResults).catch((error) => {
+    console.error("Failed to re-render flipped route map:", error);
+  });
   showResultBanner(
     "optimizeResultBanner",
-    lastOptimizeResult.route_order_flipped
+    lastOptimizeResults.route_order_flipped
       ? "Stop order flipped on all routes (last stop is now stop 1)."
       : "Original optimized stop order restored.",
     "results"
@@ -954,9 +1251,15 @@ function hasValidOptimizeEndpoints() {
 
 function getSplitMode() {
   const splitModeInput = document.getElementById("splitMode");
-  return splitModeInput?.value === "balanced_distance"
-    ? "balanced_distance"
-    : "manual";
+  const value = splitModeInput?.value;
+  if (value === "balanced_duration" || value === "balanced_distance") {
+    return "balanced_duration";
+  }
+  return "manual";
+}
+
+function isBalancedSplitMode(splitMode) {
+  return splitMode === "balanced_duration" || splitMode === "balanced_distance";
 }
 
 function getNumRoutes() {
@@ -994,7 +1297,7 @@ function renderRouteCapacityInputs() {
   const numRoutes = getNumRoutes();
   numRoutesInput.value = String(numRoutes);
 
-  if (splitMode === "balanced_distance") {
+  if (splitMode === "balanced_duration") {
     container.innerHTML = "";
     updateRouteCapacitySummary();
     return;
@@ -1060,7 +1363,7 @@ function updateRouteCapacitySummary() {
     return;
   }
 
-  if (splitMode === "balanced_distance") {
+  if (splitMode === "balanced_duration") {
     if (totalStops < numRoutes) {
       summary.textContent =
         `${totalStops} stop${totalStops === 1 ? "" : "s"} for ${numRoutes} routes — ` +
@@ -1071,7 +1374,7 @@ function updateRouteCapacitySummary() {
 
     summary.textContent =
       `${totalStops} stops across ${numRoutes} routes — ` +
-      "optimizer will split stops to balance driving distance.";
+      "optimizer will split stops to balance total time (drive + 15 min/stop).";
     summary.classList.add("route-capacity-summary--match");
     return;
   }
@@ -1121,7 +1424,7 @@ function updateButtonStates() {
   const capacitiesMatch = totalStops > 0 && capacitySum === totalStops;
   const balancedReady = totalStops >= numRoutes;
   const optimizeReady =
-    splitMode === "balanced_distance" ? balancedReady : capacitiesMatch;
+    splitMode === "balanced_duration" ? balancedReady : capacitiesMatch;
   const endpointsReady = hasValidOptimizeEndpoints();
   optimizeButton.disabled =
     !optimizeHasStops || !endpointsReady || !optimizeReady;
@@ -1176,7 +1479,7 @@ function clearOptimizeInput() {
   document.getElementById("optimizeEndSameAsStart").checked = true;
   syncOptimizeEndFromStart();
   document.getElementById("numRoutes").value = "2";
-  document.getElementById("splitMode").value = "manual";
+  document.getElementById("splitMode").value = "balanced_duration";
   renderRouteCapacityInputs();
   document.getElementById("optimizeOutput").value = "";
   document.getElementById("optimizeDistance").textContent = "";
@@ -1186,8 +1489,9 @@ function clearOptimizeInput() {
   document.getElementById("flipOrderHint").classList.add("hidden");
   document.getElementById("flipOptimizeOrderButton").hidden = true;
   document.getElementById("flipOptimizeOrderButton").textContent = "Flip Order";
-  lastOptimizeResult = null;
+  lastOptimizeResults = null;
   document.getElementById("resultsEmptyHint").classList.remove("hidden");
+  clearOptimizeResultsMap();
   hideResultBanner("optimizeResultBanner");
   clearTabBadge("results");
   savePersistedSettings();
