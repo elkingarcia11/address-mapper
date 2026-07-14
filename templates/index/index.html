@@ -273,12 +273,37 @@
               <div id="optimizeResultsMapSection" class="panel-section panel-section--flush results-map-section hidden">
                 <div class="results-map-header">
                   <label class="section-label">Route Map</label>
+                  <div class="results-map-header-actions">
+                    <button
+                      id="expandOptimizeMapButton"
+                      type="button"
+                      class="btn btn-secondary btn-small"
+                      onclick="toggleOptimizeMapExpanded()"
+                    >
+                      Expand Map
+                    </button>
+                  </div>
                   <p id="optimizeResultsMapHint" class="panel-hint hidden">
                     Add a Google Maps JavaScript API key on the Plot tab to view routes on the map.
                   </p>
                   <div id="optimizeResultsLegend" class="route-legend" aria-label="Route color legend"></div>
                 </div>
-                <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
+                <div class="results-map-shell">
+                  <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
+                  <div
+                    id="optimizeResultsMapResizeHandle"
+                    class="results-map-resize-handle"
+                    role="separator"
+                    aria-orientation="horizontal"
+                    aria-label="Drag to resize map height"
+                    title="Drag to resize map"
+                  >
+                    <span class="results-map-resize-handle__bar" aria-hidden="true"></span>
+                  </div>
+                </div>
+                <p class="field-hint results-map-resize-hint">
+                  Drag the handle below the map to make it taller, or use Expand Map.
+                </p>
               </div>
             </div>
           </section>

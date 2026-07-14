@@ -209,6 +209,7 @@ function getTruckRouteModeLabel(mode) {
 }
 
 function collectPersistedSettings() {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
   return {
     openaiApiKey: document.getElementById("openaiApiKey").value,
     googleMapsGeoApiKey: getGoogleMapsGeoKey(),
@@ -218,6 +219,10 @@ function collectPersistedSettings() {
     optimizeEndInput: document.getElementById("optimizeEndInput").value,
     optimizeEndSameAsStart: document.getElementById("optimizeEndSameAsStart").checked,
     truckRouteMode: getTruckRouteMode(),
+    optimizeResultsMapHeight: getOptimizeResultsMapHeight(),
+    optimizeResultsMapExpanded: Boolean(
+      mapSection?.classList.contains("results-map-section--expanded")
+    ),
   };
 }
 
@@ -268,6 +273,10 @@ function loadPersistedSettings() {
   ) {
     document.getElementById("truckRouteMode").value = data.truckRouteMode;
   }
+  applyOptimizeResultsMapLayout({
+    height: data.optimizeResultsMapHeight,
+    expanded: data.optimizeResultsMapExpanded,
+  });
 }
 
 function bindPersistedSettings() {
@@ -499,6 +508,184 @@ function clearOptimizeResultsMap() {
   if (hint) {
     hint.classList.add("hidden");
   }
+}
+
+const OPTIMIZE_MAP_MIN_HEIGHT = 280;
+const OPTIMIZE_MAP_DEFAULT_EXPANDED_VH = 0.78;
+
+function getOptimizeResultsMapHeight() {
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!mapElement) {
+    return null;
+  }
+  const customHeight = mapElement.style.getPropertyValue("--optimize-map-height");
+  if (customHeight) {
+    const parsed = parseInt(customHeight, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return Math.round(mapElement.getBoundingClientRect().height) || null;
+}
+
+function getOptimizeMapMaxHeight() {
+  return Math.max(OPTIMIZE_MAP_MIN_HEIGHT, Math.floor(window.innerHeight * 0.9));
+}
+
+function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = true } = {}) {
+  const mapElement = document.getElementById("optimizeResultsMap");
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  if (!mapElement || !mapSection) {
+    return;
+  }
+
+  const clamped = Math.min(
+    getOptimizeMapMaxHeight(),
+    Math.max(OPTIMIZE_MAP_MIN_HEIGHT, Math.round(heightPx))
+  );
+  mapElement.style.setProperty("--optimize-map-height", `${clamped}px`);
+  mapSection.classList.toggle(
+    "results-map-section--expanded",
+    clamped >= Math.floor(window.innerHeight * 0.7)
+  );
+  updateExpandOptimizeMapButton();
+
+  if (refreshMap && optimizeResultsMap && typeof google !== "undefined") {
+    google.maps.event.trigger(optimizeResultsMap, "resize");
+  }
+  if (persist) {
+    savePersistedSettings();
+  }
+}
+
+function applyOptimizeResultsMapLayout({ height, expanded } = {}) {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!mapSection || !mapElement) {
+    return;
+  }
+
+  if (typeof height === "number" && Number.isFinite(height) && height > 0) {
+    mapElement.style.setProperty(
+      "--optimize-map-height",
+      `${Math.round(height)}px`
+    );
+  }
+
+  if (typeof expanded === "boolean") {
+    mapSection.classList.toggle("results-map-section--expanded", expanded);
+    if (expanded && !mapElement.style.getPropertyValue("--optimize-map-height")) {
+      mapElement.style.setProperty(
+        "--optimize-map-height",
+        `${Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)}px`
+      );
+    }
+  }
+
+  updateExpandOptimizeMapButton();
+}
+
+function updateExpandOptimizeMapButton() {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const button = document.getElementById("expandOptimizeMapButton");
+  if (!button || !mapSection) {
+    return;
+  }
+  const expanded = mapSection.classList.contains("results-map-section--expanded");
+  button.textContent = expanded ? "Shrink Map" : "Expand Map";
+}
+
+function toggleOptimizeMapExpanded() {
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!mapSection || !mapElement) {
+    return;
+  }
+
+  const expanding = !mapSection.classList.contains("results-map-section--expanded");
+  if (expanding) {
+    setOptimizeResultsMapHeight(
+      Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)
+    );
+  } else {
+    mapElement.style.removeProperty("--optimize-map-height");
+    mapSection.classList.remove("results-map-section--expanded");
+    updateExpandOptimizeMapButton();
+    if (optimizeResultsMap && typeof google !== "undefined") {
+      google.maps.event.trigger(optimizeResultsMap, "resize");
+    }
+    savePersistedSettings();
+  }
+}
+
+function initOptimizeResultsMapResize() {
+  const handle = document.getElementById("optimizeResultsMapResizeHandle");
+  const mapElement = document.getElementById("optimizeResultsMap");
+  if (!handle || !mapElement) {
+    return;
+  }
+
+  let dragStartY = 0;
+  let dragStartHeight = 0;
+  let pointerId = null;
+
+  const onPointerMove = (event) => {
+    if (pointerId === null || event.pointerId !== pointerId) {
+      return;
+    }
+    const delta = event.clientY - dragStartY;
+    setOptimizeResultsMapHeight(dragStartHeight + delta, {
+      persist: false,
+      refreshMap: true,
+    });
+  };
+
+  const endDrag = (event) => {
+    if (pointerId === null || (event && event.pointerId !== pointerId)) {
+      return;
+    }
+    pointerId = null;
+    handle.classList.remove("is-dragging");
+    document.body.classList.remove("is-resizing-optimize-map");
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", endDrag);
+    if (optimizeResultsMap && typeof google !== "undefined") {
+      google.maps.event.trigger(optimizeResultsMap, "resize");
+      if (optimizeRouteOverlays.length > 0) {
+        fitOptimizeResultsMapBounds();
+      }
+    }
+    savePersistedSettings();
+  };
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button != null && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    pointerId = event.pointerId;
+    dragStartY = event.clientY;
+    dragStartHeight = mapElement.getBoundingClientRect().height;
+    handle.classList.add("is-dragging");
+    document.body.classList.add("is-resizing-optimize-map");
+    handle.setPointerCapture?.(event.pointerId);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+  });
+
+  handle.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+    event.preventDefault();
+    const current = mapElement.getBoundingClientRect().height;
+    const step = event.shiftKey ? 48 : 24;
+    setOptimizeResultsMapHeight(
+      event.key === "ArrowUp" ? current - step : current + step
+    );
+  });
+
+  handle.tabIndex = 0;
 }
 
 function buildNumberedRouteMarkerIcon(color, scale = 16) {
@@ -1584,6 +1771,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initPasswordVisibilityToggles();
   loadPersistedSettings();
   bindPersistedSettings();
+  initOptimizeResultsMapResize();
 
   addressInput.addEventListener("input", updateButtonStates);
   addressInput.addEventListener("paste", () => setTimeout(updateButtonStates, 0));
@@ -1643,6 +1831,9 @@ document.addEventListener("DOMContentLoaded", function () {
   window.addEventListener("resize", () => {
     if (activeTab === "map" && map) {
       google.maps.event.trigger(map, "resize");
+    }
+    if (activeTab === "results" && optimizeResultsMap) {
+      google.maps.event.trigger(optimizeResultsMap, "resize");
     }
   });
 });
