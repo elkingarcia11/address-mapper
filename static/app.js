@@ -626,40 +626,15 @@ async function optimizeRoute() {
     const startLabel = data.start_label || data.depot_label;
     const endLabel = data.end_label || data.depot_label;
     const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
-    const outputLines = [
-      `Start: ${startLabel}`,
-      `End: ${endLabel}`,
-      "",
-      `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
-      `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
-    ];
 
-    if (data.split_mode === "balanced_distance") {
-      outputLines.push("Split mode: balanced by driving distance per route");
-    }
-
-    outputLines.push("");
-
-    data.routes.forEach((route) => {
-      outputLines.push(
-        `--- Route ${route.route_number} (${route.target_stops} stops, ${route.distance_miles} mi) ---`
-      );
-      outputLines.push(`Start: ${startLabel}`);
-      outputLines.push(`End: ${endLabel}`);
-      route.ordered_stop_labels.forEach((address, index) => {
-        outputLines.push(`${index + 1}. ${address}`);
-      });
-      outputLines.push("");
-    });
-
-    document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
-    document.getElementById("optimizeDistance").textContent =
-      `${data.routes.length} routes · ${data.total_distance_miles} miles total`;
-
-    document.getElementById("resultsEmptyHint").classList.add("hidden");
-    document.getElementById("optimizeDistance").classList.remove("hidden");
-    document.getElementById("optimizeOutput").classList.remove("hidden");
-    document.querySelector(".results-output-label").classList.remove("hidden");
+    lastOptimizeResult = {
+      ...data,
+      start_label: startLabel,
+      end_label: endLabel,
+      truck_route_mode: truckRouteMode,
+      route_order_flipped: false,
+    };
+    renderOptimizeResults(lastOptimizeResult);
 
     const successMessage =
       data.split_mode === "balanced_distance"
@@ -680,6 +655,86 @@ async function optimizeRoute() {
     setButtonLoading("optimizeSubmit", false);
     updateButtonStates();
   }
+}
+
+let lastOptimizeResult = null;
+
+function renderOptimizeResults(data) {
+  if (!data?.routes?.length) {
+    return;
+  }
+
+  const startLabel = data.start_label || data.depot_label;
+  const endLabel = data.end_label || data.depot_label;
+  const truckRouteMode = data.truck_route_mode || getTruckRouteMode();
+  const flipped = Boolean(data.route_order_flipped);
+  const outputLines = [
+    `Start: ${startLabel}`,
+    `End: ${endLabel}`,
+    "",
+    `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
+    `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
+  ];
+
+  if (data.split_mode === "balanced_distance") {
+    outputLines.push("Split mode: balanced by driving distance per route");
+  }
+  if (flipped) {
+    outputLines.push("Stop order: reversed (flipped)");
+  }
+
+  outputLines.push("");
+
+  data.routes.forEach((route) => {
+    outputLines.push(
+      `--- Route ${route.route_number} (${route.target_stops} stops, ${route.distance_miles} mi) ---`
+    );
+    outputLines.push(`Start: ${startLabel}`);
+    outputLines.push(`End: ${endLabel}`);
+    route.ordered_stop_labels.forEach((address, index) => {
+      outputLines.push(`${index + 1}. ${address}`);
+    });
+    outputLines.push("");
+  });
+
+  document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
+  document.getElementById("optimizeDistance").textContent =
+    `${data.routes.length} routes · ${data.total_distance_miles} miles total` +
+    (flipped ? " · order flipped" : "");
+
+  document.getElementById("resultsEmptyHint").classList.add("hidden");
+  document.getElementById("optimizeDistance").classList.remove("hidden");
+  document.getElementById("optimizeOutput").classList.remove("hidden");
+  document.querySelector(".results-output-label").classList.remove("hidden");
+  document.getElementById("flipOrderHint").classList.remove("hidden");
+
+  const flipButton = document.getElementById("flipOptimizeOrderButton");
+  flipButton.hidden = false;
+  flipButton.textContent = flipped ? "Restore Original Order" : "Flip Order";
+}
+
+function flipOptimizeRouteOrder() {
+  if (!lastOptimizeResult?.routes?.length) {
+    return;
+  }
+
+  lastOptimizeResult = {
+    ...lastOptimizeResult,
+    route_order_flipped: !lastOptimizeResult.route_order_flipped,
+    routes: lastOptimizeResult.routes.map((route) => ({
+      ...route,
+      ordered_stop_labels: [...route.ordered_stop_labels].reverse(),
+    })),
+  };
+
+  renderOptimizeResults(lastOptimizeResult);
+  showResultBanner(
+    "optimizeResultBanner",
+    lastOptimizeResult.route_order_flipped
+      ? "Stop order flipped on all routes (last stop is now stop 1)."
+      : "Original optimized stop order restored.",
+    "results"
+  );
 }
 
 const SANITIZED_ADDRESS_RE =
@@ -1128,6 +1183,10 @@ function clearOptimizeInput() {
   document.getElementById("optimizeDistance").classList.add("hidden");
   document.getElementById("optimizeOutput").classList.add("hidden");
   document.querySelector(".results-output-label").classList.add("hidden");
+  document.getElementById("flipOrderHint").classList.add("hidden");
+  document.getElementById("flipOptimizeOrderButton").hidden = true;
+  document.getElementById("flipOptimizeOrderButton").textContent = "Flip Order";
+  lastOptimizeResult = null;
   document.getElementById("resultsEmptyHint").classList.remove("hidden");
   hideResultBanner("optimizeResultBanner");
   clearTabBadge("results");

@@ -251,7 +251,21 @@
 
               <div class="panel-section panel-section--grow">
                 <p id="optimizeDistance" class="results-distance hidden"></p>
-                <label class="section-label results-output-label hidden" for="optimizeOutput">Optimized Routes</label>
+                <div class="section-label-row results-output-label hidden">
+                  <label class="section-label" for="optimizeOutput">Optimized Routes</label>
+                  <button
+                    id="flipOptimizeOrderButton"
+                    type="button"
+                    class="btn btn-secondary btn-small"
+                    onclick="flipOptimizeRouteOrder()"
+                    hidden
+                  >
+                    Flip Order
+                  </button>
+                </div>
+                <p id="flipOrderHint" class="field-hint hidden">
+                  Reverse stop order on every route (1 becomes last, last becomes 1). Start and end stay the same.
+                </p>
                 <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
               </div>
             </div>

@@ -648,6 +648,17 @@ textarea::placeholder {
   border-radius: var(--radius-sm);
 }
 
+.btn-small {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+#flipOrderHint {
+  margin-top: calc(-1 * var(--space-xs));
+  text-align: left;
+}
+
 /* Result banner */
 .result-banner {
   display: flex;
