@@ -34,44 +34,124 @@
     </div>
 
     <div class="app-shell">
-      <header class="app-header">
-        <h1>Address Mapper</h1>
-        <p class="app-subtitle">Extract, plot, and optimize address routes</p>
-      </header>
+      <div class="app-body">
+        <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+        <aside id="appSidebar" class="app-sidebar" aria-label="Configuration">
+          <div class="sidebar-header">
+            <h2>Configuration</h2>
+            <button
+              id="sidebarCollapse"
+              type="button"
+              class="icon-btn sidebar-collapse"
+              aria-label="Collapse configuration menu"
+            >
+              <svg class="icon-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6"></path>
+              </svg>
+            </button>
+          </div>
 
-      <div class="workspace">
-        <nav class="tab-bar" role="tablist" aria-label="Main navigation">
-          <button class="tab active" data-tab="convert" role="tab" aria-selected="true">Convert Blob to Addresses</button>
-          <button class="tab" data-tab="plot" role="tab" aria-selected="false">
-            Plot Addresses on Map
-            <span id="plotTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
-          </button>
-          <button class="tab" data-tab="map" role="tab" aria-selected="false">
-            Map View
-            <span id="mapTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
-          </button>
-          <button class="tab" data-tab="optimize" role="tab" aria-selected="false">Optimize Route</button>
-          <button class="tab" data-tab="results" role="tab" aria-selected="false">
-            Optimized Route Results
-            <span id="resultsTabBadge" class="tab-badge hidden" aria-hidden="true"></span>
-          </button>
-        </nav>
+          <nav class="tab-bar tab-bar--sidebar" role="tablist" aria-label="Main navigation">
+            <p class="sidebar-label">Tabs</p>
+            <button class="tab active" data-tab="convert" role="tab" aria-selected="true">Convert Blob to Addresses</button>
+            <button class="tab" data-tab="plot" role="tab" aria-selected="false">
+              Plot Addresses on Map
+              <span class="tab-badge hidden" aria-hidden="true"></span>
+            </button>
+            <button class="tab" data-tab="map" role="tab" aria-selected="false">
+              Map View
+              <span class="tab-badge hidden" aria-hidden="true"></span>
+            </button>
+            <button class="tab" data-tab="optimize" role="tab" aria-selected="false">Optimize Route</button>
+            <button class="tab" data-tab="results" role="tab" aria-selected="false">
+              Optimized Route Results
+              <span class="tab-badge hidden" aria-hidden="true"></span>
+            </button>
+          </nav>
 
-        <div class="tab-panels">
+          <div class="sidebar-config">
+            <p class="sidebar-label">API keys</p>
+
+            <details class="sidebar-section" data-config-section="openai">
+              <summary class="sidebar-section__summary">OpenAI</summary>
+              <div class="sidebar-section__body">
+                <div class="field-group">
+                  <label for="openaiApiKey">OpenAI API Key</label>
+                  <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" autocomplete="off" />
+                </div>
+              </div>
+            </details>
+
+            <details class="sidebar-section" data-config-section="google">
+              <summary class="sidebar-section__summary">Google Maps</summary>
+              <div class="sidebar-section__body">
+                <div class="field-group">
+                  <label for="googleMapsGeoApiKey">Geocoding API Key</label>
+                  <input type="password" id="googleMapsGeoApiKey" placeholder="Enter your Geocoding API key" autocomplete="off" />
+                </div>
+                <div class="field-group">
+                  <label for="googleMapsJsApiKey">JavaScript API Key</label>
+                  <input type="password" id="googleMapsJsApiKey" placeholder="Enter your JavaScript API key" autocomplete="off" />
+                </div>
+              </div>
+            </details>
+
+            <details class="sidebar-section" data-config-section="ors">
+              <summary class="sidebar-section__summary">OpenRouteService</summary>
+              <div class="sidebar-section__body">
+                <div class="field-group">
+                  <label for="orsApiKey">OpenRouteService API Key</label>
+                  <input type="password" id="orsApiKey" placeholder="Enter your OpenRouteService API key" autocomplete="off" />
+                </div>
+              </div>
+            </details>
+          </div>
+        </aside>
+
+        <div class="app-main">
+          <header class="app-header">
+            <button
+              id="sidebarToggle"
+              type="button"
+              class="icon-btn sidebar-toggle"
+              aria-label="Toggle configuration menu"
+              aria-controls="appSidebar"
+              aria-expanded="false"
+            >
+              <svg class="icon-btn__icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16"></path>
+              </svg>
+            </button>
+            <div class="app-brand">
+              <h1>Address Mapper</h1>
+              <p class="app-subtitle">Extract, plot, and optimize address routes</p>
+            </div>
+            <nav class="tab-bar tab-bar--header" role="tablist" aria-label="Main navigation">
+              <button class="tab active" data-tab="convert" role="tab" aria-selected="true">Convert Blob to Addresses</button>
+              <button class="tab" data-tab="plot" role="tab" aria-selected="false">
+                Plot Addresses on Map
+                <span class="tab-badge hidden" aria-hidden="true"></span>
+              </button>
+              <button class="tab" data-tab="map" role="tab" aria-selected="false">
+                Map View
+                <span class="tab-badge hidden" aria-hidden="true"></span>
+              </button>
+              <button class="tab" data-tab="optimize" role="tab" aria-selected="false">Optimize Route</button>
+              <button class="tab" data-tab="results" role="tab" aria-selected="false">
+                Optimized Route Results
+                <span class="tab-badge hidden" aria-hidden="true"></span>
+              </button>
+            </nav>
+          </header>
+
+          <div class="workspace">
+            <div class="tab-panels">
           <!-- Convert -->
           <section id="tab-convert" class="tab-panel active" role="tabpanel">
             <div class="panel-card">
               <div class="panel-header">
                 <h2>Convert Blob to Addresses</h2>
                 <p class="panel-hint">Paste unstructured text and extract a list of addresses.</p>
-              </div>
-
-              <div class="panel-section api-section">
-                <h3 class="section-label">API Configuration</h3>
-                <div class="field-group">
-                  <label for="openaiApiKey">OpenAI API Key</label>
-                  <input type="password" id="openaiApiKey" placeholder="Enter your OpenAI API key" />
-                </div>
               </div>
 
               <div class="panel-section panel-section--grow">
@@ -103,20 +183,6 @@
               <div class="panel-header">
                 <h2>Plot Addresses on Map</h2>
                 <p class="panel-hint">One address per line in sanitized format: <em>street address, city, ST ZIP</em> (example: <em>2249 Washington Ave, Bronx, NY 10456</em>). Use Convert Blob to Addresses to prepare input.</p>
-              </div>
-
-              <div class="panel-section api-section">
-                <h3 class="section-label">API Configuration</h3>
-                <div class="field-grid">
-                  <div class="field-group">
-                    <label for="googleMapsGeoApiKey">Google Maps Geocoding API Key</label>
-                    <input type="password" id="googleMapsGeoApiKey" placeholder="Enter your Geocoding API key" />
-                  </div>
-                  <div class="field-group">
-                    <label for="googleMapsJsApiKey">Google Maps JavaScript API Key</label>
-                    <input type="password" id="googleMapsJsApiKey" placeholder="Enter your JavaScript API key" />
-                  </div>
-                </div>
               </div>
 
               <div class="panel-section panel-section--grow">
@@ -156,20 +222,6 @@
                 <h2>Optimize Route</h2>
                 <p class="panel-hint">Use the format <em>street address, city, ST ZIP</em>. Set a start and end for every route, then list stops to split across routes below.</p>
               </div>
-
-              <details class="panel-section api-section api-section--collapsible">
-                <summary class="api-section__summary">API Configuration</summary>
-                <div class="field-grid">
-                  <div class="field-group">
-                    <label for="googleMapsGeoApiKeyOptimize">Google Maps Geocoding API Key</label>
-                    <input type="password" id="googleMapsGeoApiKeyOptimize" placeholder="Enter your Geocoding API key" />
-                  </div>
-                  <div class="field-group">
-                    <label for="orsApiKey">OpenRouteService API Key</label>
-                    <input type="password" id="orsApiKey" placeholder="Enter your OpenRouteService API key" />
-                  </div>
-                </div>
-              </details>
 
               <div class="panel-section">
                 <h3 class="section-label">Route Configuration</h3>
@@ -252,28 +304,22 @@
 
               <div class="panel-section panel-section--grow">
                 <p id="optimizeDistance" class="results-distance hidden"></p>
-                <div class="section-label-row results-output-label hidden">
-                  <label class="section-label" for="optimizeOutput">Optimized Routes</label>
-                  <button
-                    id="flipOptimizeOrderButton"
-                    type="button"
-                    class="btn btn-secondary btn-small"
-                    onclick="flipOptimizeRouteOrder()"
-                    hidden
-                  >
-                    Flip Order
-                  </button>
-                </div>
-                <p id="flipOrderHint" class="field-hint hidden">
-                  Reverse stop order on every route (1 becomes last, last becomes 1). Start and end stay the same.
-                </p>
-                <textarea id="optimizeOutput" rows="12" readonly class="results-output hidden" placeholder="Optimized addresses will appear here..."></textarea>
               </div>
 
               <div id="optimizeResultsMapSection" class="panel-section panel-section--flush results-map-section hidden">
                 <div class="results-map-header">
                   <label class="section-label">Route Map</label>
                   <div class="results-map-header-actions">
+                    <button
+                      id="flipOptimizeOrderButton"
+                      type="button"
+                      class="btn btn-secondary btn-small"
+                      onclick="flipOptimizeRouteOrder()"
+                      title="Reverse stop order on every route (1 becomes last, last becomes 1). Start and end stay the same."
+                      hidden
+                    >
+                      Flip Order
+                    </button>
                     <button
                       id="expandOptimizeMapButton"
                       type="button"
@@ -284,29 +330,45 @@
                     </button>
                   </div>
                   <p id="optimizeResultsMapHint" class="panel-hint hidden">
-                    Add a Google Maps JavaScript API key on the Plot tab to view routes on the map.
+                    Add a Google Maps JavaScript API key in Configuration to view routes on the map.
                   </p>
                   <div id="optimizeResultsLegend" class="route-legend" aria-label="Route color legend"></div>
                 </div>
-                <div class="results-map-shell">
-                  <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
-                  <div
-                    id="optimizeResultsMapResizeHandle"
-                    class="results-map-resize-handle"
-                    role="separator"
-                    aria-orientation="horizontal"
-                    aria-label="Drag to resize map height"
-                    title="Drag to resize map"
-                  >
-                    <span class="results-map-resize-handle__bar" aria-hidden="true"></span>
+                <div class="results-map-layout">
+                  <div class="results-map-column">
+                    <div class="results-map-shell">
+                      <div id="optimizeResultsMap" role="region" aria-label="Optimized routes map"></div>
+                      <div
+                        id="optimizeResultsMapResizeHandle"
+                        class="results-map-resize-handle"
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Drag to resize map height"
+                        title="Drag to resize map"
+                      >
+                        <span class="results-map-resize-handle__bar" aria-hidden="true"></span>
+                      </div>
+                    </div>
+                    <p class="field-hint results-map-resize-hint">
+                      Drag the handle below the map to make it taller, or use Expand Map.
+                    </p>
+                  </div>
+                  <div class="results-list-column">
+                    <label class="section-label" for="optimizeOutput">Optimized Routes</label>
+                    <div
+                      id="optimizeOutput"
+                      class="results-route-list hidden"
+                      tabindex="0"
+                      role="region"
+                      aria-label="Optimized route stops"
+                    ></div>
                   </div>
                 </div>
-                <p class="field-hint results-map-resize-hint">
-                  Drag the handle below the map to make it taller, or use Expand Map.
-                </p>
               </div>
             </div>
           </section>
+            </div>
+          </div>
         </div>
       </div>
     </div>

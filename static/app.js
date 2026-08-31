@@ -143,17 +143,152 @@ const TAB_LABELS = {
 };
 
 const API_KEY_CONFIG = {
-  openai: { tab: "convert", inputId: "openaiApiKey" },
-  googleMapsGeo: { tab: "plot", inputId: "googleMapsGeoApiKey" },
-  googleMapsGeoOptimize: { tab: "optimize", inputId: "googleMapsGeoApiKeyOptimize" },
-  googleMapsJs: { tab: "plot", inputId: "googleMapsJsApiKey" },
-  ors: { tab: "optimize", inputId: "orsApiKey" },
+  openai: { configSection: "openai", inputId: "openaiApiKey" },
+  googleMapsGeo: { configSection: "google", inputId: "googleMapsGeoApiKey" },
+  googleMapsJs: { configSection: "google", inputId: "googleMapsJsApiKey" },
+  ors: { configSection: "ors", inputId: "orsApiKey" },
 };
 
+const SIDEBAR_COLLAPSED_KEY = "addressMapper.sidebarCollapsed";
+const MOBILE_BREAKPOINT = 860;
+
+function isMobileLayout() {
+  return window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+function getAppShell() {
+  return document.querySelector(".app-shell");
+}
+
+function updateSidebarToggleAria(expanded) {
+  const toggle = document.getElementById("sidebarToggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(expanded));
+  }
+}
+
+function openSidebar() {
+  const shell = getAppShell();
+  if (!shell) {
+    return;
+  }
+
+  if (isMobileLayout()) {
+    shell.classList.add("sidebar-open");
+    const backdrop = document.getElementById("sidebarBackdrop");
+    if (backdrop) {
+      backdrop.hidden = false;
+    }
+    updateSidebarToggleAria(true);
+    return;
+  }
+
+  shell.classList.remove("sidebar-collapsed");
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "false");
+  updateSidebarToggleAria(true);
+}
+
+function closeMobileSidebar() {
+  const shell = getAppShell();
+  if (!shell || !isMobileLayout()) {
+    return;
+  }
+
+  shell.classList.remove("sidebar-open");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (backdrop) {
+    backdrop.hidden = true;
+  }
+  updateSidebarToggleAria(false);
+}
+
+function openConfigSection(sectionName) {
+  openSidebar();
+  const section = document.querySelector(
+    `[data-config-section="${sectionName}"]`
+  );
+  if (section) {
+    section.open = true;
+  }
+}
+
+function initSidebar() {
+  const shell = getAppShell();
+  const toggle = document.getElementById("sidebarToggle");
+  const collapse = document.getElementById("sidebarCollapse");
+  const backdrop = document.getElementById("sidebarBackdrop");
+
+  if (!shell || !toggle) {
+    return;
+  }
+
+  if (isMobileLayout()) {
+    updateSidebarToggleAria(false);
+  } else {
+    const collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    shell.classList.toggle("sidebar-collapsed", collapsed);
+    updateSidebarToggleAria(!collapsed);
+  }
+
+  toggle.addEventListener("click", () => {
+    if (isMobileLayout()) {
+      const willOpen = !shell.classList.contains("sidebar-open");
+      shell.classList.toggle("sidebar-open", willOpen);
+      if (backdrop) {
+        backdrop.hidden = !willOpen;
+      }
+      updateSidebarToggleAria(willOpen);
+      return;
+    }
+
+    const willExpand = shell.classList.contains("sidebar-collapsed");
+    shell.classList.toggle("sidebar-collapsed", !willExpand);
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!willExpand));
+    updateSidebarToggleAria(willExpand);
+  });
+
+  collapse?.addEventListener("click", () => {
+    if (isMobileLayout()) {
+      closeMobileSidebar();
+      return;
+    }
+
+    shell.classList.add("sidebar-collapsed");
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "true");
+    updateSidebarToggleAria(false);
+  });
+
+  backdrop?.addEventListener("click", closeMobileSidebar);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeMobileSidebar();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (isMobileLayout()) {
+      shell.classList.remove("sidebar-collapsed");
+      shell.classList.remove("sidebar-open");
+      if (backdrop) {
+        backdrop.hidden = true;
+      }
+      updateSidebarToggleAria(false);
+      return;
+    }
+
+    shell.classList.remove("sidebar-open");
+    if (backdrop) {
+      backdrop.hidden = true;
+    }
+    const collapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    shell.classList.toggle("sidebar-collapsed", collapsed);
+    updateSidebarToggleAria(!collapsed);
+  });
+}
+
 function getGoogleMapsGeoKey() {
-  const plotKey = document.getElementById("googleMapsGeoApiKey").value.trim();
-  const optimizeKey = document.getElementById("googleMapsGeoApiKeyOptimize").value.trim();
-  return plotKey || optimizeKey;
+  return document.getElementById("googleMapsGeoApiKey").value.trim();
 }
 
 function getApiKeys() {
@@ -163,20 +298,6 @@ function getApiKeys() {
     openai: document.getElementById("openaiApiKey").value.trim(),
     ors: document.getElementById("orsApiKey").value.trim(),
   };
-}
-
-function syncGoogleMapsGeoKeys(sourceId) {
-  const plotInput = document.getElementById("googleMapsGeoApiKey");
-  const optimizeInput = document.getElementById("googleMapsGeoApiKeyOptimize");
-  const value = document.getElementById(sourceId).value;
-
-  if (sourceId === "googleMapsGeoApiKey") {
-    optimizeInput.value = value;
-  } else {
-    plotInput.value = value;
-  }
-
-  savePersistedSettings();
 }
 
 const PERSISTED_SETTINGS_KEY = "addressMapper.settings";
@@ -248,8 +369,6 @@ function loadPersistedSettings() {
   }
   if (typeof data.googleMapsGeoApiKey === "string") {
     document.getElementById("googleMapsGeoApiKey").value = data.googleMapsGeoApiKey;
-    document.getElementById("googleMapsGeoApiKeyOptimize").value =
-      data.googleMapsGeoApiKey;
   }
   if (typeof data.googleMapsJsApiKey === "string") {
     document.getElementById("googleMapsJsApiKey").value = data.googleMapsJsApiKey;
@@ -283,7 +402,6 @@ function bindPersistedSettings() {
   [
     "openaiApiKey",
     "googleMapsGeoApiKey",
-    "googleMapsGeoApiKeyOptimize",
     "googleMapsJsApiKey",
     "orsApiKey",
     "optimizeStartInput",
@@ -300,7 +418,7 @@ function bindPersistedSettings() {
     .addEventListener("change", savePersistedSettings);
 }
 
-function validateApiKeys(requiredKeys = [], contextTab = null) {
+function validateApiKeys(requiredKeys = []) {
   const apiKeys = getApiKeys();
   const missing = requiredKeys.filter((key) => !apiKeys[key]);
 
@@ -315,12 +433,9 @@ function validateApiKeys(requiredKeys = [], contextTab = null) {
     alert(`Please provide the following API keys: ${names.join(", ")}`);
 
     const firstMissing = missing[0];
-    let config = API_KEY_CONFIG[firstMissing];
-    if (firstMissing === "googleMapsGeo" && contextTab === "optimize") {
-      config = API_KEY_CONFIG.googleMapsGeoOptimize;
-    }
+    const config = API_KEY_CONFIG[firstMissing];
     if (config) {
-      switchTab(config.tab);
+      openConfigSection(config.configSection);
       const input = document.getElementById(config.inputId);
       if (input) {
         input.focus();
@@ -369,20 +484,23 @@ function switchTab(tabId) {
   }
 
   clearTabBadge(tabId);
+  closeMobileSidebar();
 }
 
 function setTabBadge(tabId) {
-  const badge = document.getElementById(`${tabId}TabBadge`);
-  if (badge) {
-    badge.classList.remove("hidden");
-  }
+  document
+    .querySelectorAll(`.tab[data-tab="${tabId}"] .tab-badge`)
+    .forEach((badge) => {
+      badge.classList.remove("hidden");
+    });
 }
 
 function clearTabBadge(tabId) {
-  const badge = document.getElementById(`${tabId}TabBadge`);
-  if (badge) {
-    badge.classList.add("hidden");
-  }
+  document
+    .querySelectorAll(`.tab[data-tab="${tabId}"] .tab-badge`)
+    .forEach((badge) => {
+      badge.classList.add("hidden");
+    });
 }
 
 function showResultBanner(bannerId, message, targetTabId) {
@@ -510,20 +628,29 @@ function clearOptimizeResultsMap() {
   }
 }
 
-const OPTIMIZE_MAP_MIN_HEIGHT = 280;
+const OPTIMIZE_MAP_MIN_HEIGHT = 360;
 const OPTIMIZE_MAP_DEFAULT_EXPANDED_VH = 0.78;
 
+function getOptimizeResultsMapLayout() {
+  return document.querySelector(".results-map-layout");
+}
+
 function getOptimizeResultsMapHeight() {
+  const layout = getOptimizeResultsMapLayout();
   const mapElement = document.getElementById("optimizeResultsMap");
-  if (!mapElement) {
+  const heightSource = layout || mapElement;
+  if (!heightSource) {
     return null;
   }
-  const customHeight = mapElement.style.getPropertyValue("--optimize-map-height");
+  const customHeight = heightSource.style.getPropertyValue("--optimize-map-height");
   if (customHeight) {
     const parsed = parseInt(customHeight, 10);
     return Number.isFinite(parsed) ? parsed : null;
   }
-  return Math.round(mapElement.getBoundingClientRect().height) || null;
+  if (mapElement) {
+    return Math.round(mapElement.getBoundingClientRect().height) || null;
+  }
+  return null;
 }
 
 function getOptimizeMapMaxHeight() {
@@ -533,6 +660,7 @@ function getOptimizeMapMaxHeight() {
 function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = true } = {}) {
   const mapElement = document.getElementById("optimizeResultsMap");
   const mapSection = document.getElementById("optimizeResultsMapSection");
+  const layout = getOptimizeResultsMapLayout();
   if (!mapElement || !mapSection) {
     return;
   }
@@ -541,7 +669,11 @@ function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = tr
     getOptimizeMapMaxHeight(),
     Math.max(OPTIMIZE_MAP_MIN_HEIGHT, Math.round(heightPx))
   );
-  mapElement.style.setProperty("--optimize-map-height", `${clamped}px`);
+  const heightValue = `${clamped}px`;
+  if (layout) {
+    layout.style.setProperty("--optimize-map-height", heightValue);
+  }
+  mapElement.style.setProperty("--optimize-map-height", heightValue);
   mapSection.classList.toggle(
     "results-map-section--expanded",
     clamped >= Math.floor(window.innerHeight * 0.7)
@@ -559,24 +691,27 @@ function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = tr
 function applyOptimizeResultsMapLayout({ height, expanded } = {}) {
   const mapSection = document.getElementById("optimizeResultsMapSection");
   const mapElement = document.getElementById("optimizeResultsMap");
+  const layout = getOptimizeResultsMapLayout();
   if (!mapSection || !mapElement) {
     return;
   }
 
   if (typeof height === "number" && Number.isFinite(height) && height > 0) {
-    mapElement.style.setProperty(
-      "--optimize-map-height",
-      `${Math.round(height)}px`
-    );
+    const heightValue = `${Math.round(height)}px`;
+    if (layout) {
+      layout.style.setProperty("--optimize-map-height", heightValue);
+    }
+    mapElement.style.setProperty("--optimize-map-height", heightValue);
   }
 
   if (typeof expanded === "boolean") {
     mapSection.classList.toggle("results-map-section--expanded", expanded);
-    if (expanded && !mapElement.style.getPropertyValue("--optimize-map-height")) {
-      mapElement.style.setProperty(
-        "--optimize-map-height",
-        `${Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)}px`
-      );
+    if (expanded && !(layout || mapElement).style.getPropertyValue("--optimize-map-height")) {
+      const defaultHeight = `${Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)}px`;
+      if (layout) {
+        layout.style.setProperty("--optimize-map-height", defaultHeight);
+      }
+      mapElement.style.setProperty("--optimize-map-height", defaultHeight);
     }
   }
 
@@ -606,6 +741,10 @@ function toggleOptimizeMapExpanded() {
       Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)
     );
   } else {
+    const layout = getOptimizeResultsMapLayout();
+    if (layout) {
+      layout.style.removeProperty("--optimize-map-height");
+    }
     mapElement.style.removeProperty("--optimize-map-height");
     mapSection.classList.remove("results-map-section--expanded");
     updateExpandOptimizeMapButton();
@@ -962,7 +1101,7 @@ async function extractAddresses() {
 }
 
 async function optimizeRoute() {
-  if (!validateApiKeys(["googleMapsGeo", "ors"], "optimize")) {
+  if (!validateApiKeys(["googleMapsGeo", "ors"])) {
     return;
   }
 
@@ -1136,52 +1275,129 @@ function renderOptimizeResults(data) {
   );
   const minutesPerStop = Math.round((data.stop_service_seconds || 0) / 60);
 
-  const outputLines = [
-    `Start: ${startLabel}`,
-    `End: ${endLabel}`,
-    "",
-    `Truck routing: ${getTruckRouteModeLabel(truckRouteMode)}`,
-    `Total time (drive + stops): ${formatDriveDuration(data.total_time_seconds)}`,
-    `  Drive time: ${formatDriveDuration(data.total_duration_seconds)}`,
-    `  Stop time: ${formatDriveDuration(data.total_service_seconds)} (${minutesPerStop} min × ${totalStops} stops)`,
-    `Total distance: ${data.total_distance_miles} miles (${data.total_distance_meters.toLocaleString()} meters)`,
+  const summaryLines = [
+    `<p><strong>Start:</strong> ${escapeHtml(startLabel)}</p>`,
+    `<p><strong>End:</strong> ${escapeHtml(endLabel)}</p>`,
+    `<p><strong>Truck routing:</strong> ${escapeHtml(getTruckRouteModeLabel(truckRouteMode))}</p>`,
+    `<p><strong>Total time:</strong> ${escapeHtml(formatDriveDuration(data.total_time_seconds))} (drive ${escapeHtml(formatDriveDuration(data.total_duration_seconds))} + stops ${escapeHtml(formatDriveDuration(data.total_service_seconds))})</p>`,
+    `<p><strong>Total distance:</strong> ${escapeHtml(String(data.total_distance_miles))} mi</p>`,
   ];
 
   if (isBalancedSplitMode(data.split_mode)) {
-    outputLines.push("Split mode: balanced by total time (drive + stops) per route");
+    summaryLines.push(
+      "<p><strong>Split mode:</strong> balanced by total time per route</p>"
+    );
   }
   if (flipped) {
-    outputLines.push("Stop order: reversed (flipped)");
+    summaryLines.push("<p><strong>Stop order:</strong> reversed (flipped)</p>");
   }
 
-  outputLines.push("");
+  const routesHtml = data.routes
+    .map((route, routeIndex) => {
+      const color = getRouteMapColor(route.route_number);
+      const header = `Route ${route.route_number} (${route.target_stops} stops · ${formatDriveDuration(route.time_seconds)} total · ${formatDriveDuration(route.duration_seconds)} drive · ${route.distance_miles} mi)`;
+      const stopsHtml = (route.ordered_stop_labels || [])
+        .map(
+          (address, stopIndex) =>
+            `<div class="results-route-stop">
+              <span class="results-route-stop__num">${stopIndex + 1}</span>
+              <span class="results-route-stop__addr">${escapeHtml(address)}</span>
+              <button
+                type="button"
+                class="results-stop-delete"
+                data-route-index="${routeIndex}"
+                data-stop-index="${stopIndex}"
+                aria-label="Remove stop ${stopIndex + 1} from route ${route.route_number}"
+                title="Remove stop"
+              >&times;</button>
+            </div>`
+        )
+        .join("");
 
-  data.routes.forEach((route) => {
-    outputLines.push(
-      `--- Route ${route.route_number} (${route.target_stops} stops · ${formatDriveDuration(route.time_seconds)} total · ${formatDriveDuration(route.duration_seconds)} drive · ${route.distance_miles} mi) ---`
-    );
-    outputLines.push(`Start: ${startLabel}`);
-    outputLines.push(`End: ${endLabel}`);
-    route.ordered_stop_labels.forEach((address, index) => {
-      outputLines.push(`${index + 1}. ${address}`);
-    });
-    outputLines.push("");
-  });
+      return `<div class="results-route-group">
+        <div class="results-route-group__header" style="border-left-color:${color}">${escapeHtml(header)}</div>
+        ${stopsHtml}
+      </div>`;
+    })
+    .join("");
 
-  document.getElementById("optimizeOutput").value = outputLines.join("\n").trim();
+  const listEl = document.getElementById("optimizeOutput");
+  listEl.innerHTML = `<div class="results-route-summary">${summaryLines.join("")}</div>${routesHtml}`;
+
   document.getElementById("optimizeDistance").textContent =
     `${data.routes.length} routes · ${formatDriveDuration(data.total_time_seconds)} total time` +
-    (flipped ? " · order flipped" : "");
+    (flipped ? " · order flipped" : "") +
+    ` · ${minutesPerStop} min × ${totalStops} stops`;
 
   document.getElementById("resultsEmptyHint").classList.add("hidden");
   document.getElementById("optimizeDistance").classList.remove("hidden");
   document.getElementById("optimizeOutput").classList.remove("hidden");
-  document.querySelector(".results-output-label").classList.remove("hidden");
-  document.getElementById("flipOrderHint").classList.remove("hidden");
+  document.getElementById("optimizeResultsMapSection").classList.remove("hidden");
 
   const flipButton = document.getElementById("flipOptimizeOrderButton");
   flipButton.hidden = false;
   flipButton.textContent = flipped ? "Restore Original Order" : "Flip Order";
+}
+
+function deleteOptimizeStop(routeIndex, stopIndex) {
+  if (!lastOptimizeResults?.routes?.[routeIndex]) {
+    return;
+  }
+
+  const route = lastOptimizeResults.routes[routeIndex];
+  const stopCount = route.ordered_stop_labels?.length ?? 0;
+  if (stopCount <= 1) {
+    alert("Each route must keep at least one stop.");
+    return;
+  }
+
+  const stopServiceSeconds = lastOptimizeResults.stop_service_seconds || 0;
+  const locationIndex = stopIndex + 1;
+
+  const updatedRoutes = lastOptimizeResults.routes.map((currentRoute, index) => {
+    if (index !== routeIndex) {
+      return currentRoute;
+    }
+
+    return {
+      ...currentRoute,
+      ordered_stop_labels: currentRoute.ordered_stop_labels.filter(
+        (_, stopIdx) => stopIdx !== stopIndex
+      ),
+      ordered_locations: (currentRoute.ordered_locations || []).filter(
+        (_, locIdx) => locIdx !== locationIndex
+      ),
+      ordered_coordinates: (currentRoute.ordered_coordinates || []).filter(
+        (_, coordIdx) => coordIdx !== locationIndex
+      ),
+      target_stops: currentRoute.target_stops - 1,
+      service_seconds: Math.max(0, (currentRoute.service_seconds || 0) - stopServiceSeconds),
+      time_seconds: Math.max(0, (currentRoute.time_seconds || 0) - stopServiceSeconds),
+    };
+  });
+
+  lastOptimizeResults = {
+    ...lastOptimizeResults,
+    routes: updatedRoutes,
+    total_service_seconds: Math.max(
+      0,
+      (lastOptimizeResults.total_service_seconds || 0) - stopServiceSeconds
+    ),
+    total_time_seconds: Math.max(
+      0,
+      (lastOptimizeResults.total_time_seconds || 0) - stopServiceSeconds
+    ),
+  };
+
+  renderOptimizeResults(lastOptimizeResults);
+  renderOptimizedRoutesMap(lastOptimizeResults).catch((error) => {
+    console.error("Failed to re-render route map after stop removal:", error);
+  });
+  showResultBanner(
+    "optimizeResultBanner",
+    "Stop removed from route.",
+    "results"
+  );
 }
 
 function reverseRouteMiddle(items) {
@@ -1668,12 +1884,10 @@ function clearOptimizeInput() {
   document.getElementById("numRoutes").value = "2";
   document.getElementById("splitMode").value = "balanced_duration";
   renderRouteCapacityInputs();
-  document.getElementById("optimizeOutput").value = "";
+  document.getElementById("optimizeOutput").innerHTML = "";
   document.getElementById("optimizeDistance").textContent = "";
   document.getElementById("optimizeDistance").classList.add("hidden");
   document.getElementById("optimizeOutput").classList.add("hidden");
-  document.querySelector(".results-output-label").classList.add("hidden");
-  document.getElementById("flipOrderHint").classList.add("hidden");
   document.getElementById("flipOptimizeOrderButton").hidden = true;
   document.getElementById("flipOptimizeOrderButton").textContent = "Flip Order";
   lastOptimizeResults = null;
@@ -1768,10 +1982,25 @@ document.addEventListener("DOMContentLoaded", function () {
     tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   });
 
+  initSidebar();
   initPasswordVisibilityToggles();
   loadPersistedSettings();
   bindPersistedSettings();
   initOptimizeResultsMapResize();
+
+  const optimizeOutput = document.getElementById("optimizeOutput");
+  optimizeOutput?.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest("[data-stop-index]");
+    if (!deleteButton) {
+      return;
+    }
+    const routeIndex = Number.parseInt(deleteButton.dataset.routeIndex, 10);
+    const stopIndex = Number.parseInt(deleteButton.dataset.stopIndex, 10);
+    if (Number.isNaN(routeIndex) || Number.isNaN(stopIndex)) {
+      return;
+    }
+    deleteOptimizeStop(routeIndex, stopIndex);
+  });
 
   addressInput.addEventListener("input", updateButtonStates);
   addressInput.addEventListener("paste", () => setTimeout(updateButtonStates, 0));
@@ -1818,13 +2047,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   renderRouteCapacityInputs();
   syncOptimizeEndFromStart();
-
-  document.getElementById("googleMapsGeoApiKey").addEventListener("input", () => {
-    syncGoogleMapsGeoKeys("googleMapsGeoApiKey");
-  });
-  document.getElementById("googleMapsGeoApiKeyOptimize").addEventListener("input", () => {
-    syncGoogleMapsGeoKeys("googleMapsGeoApiKeyOptimize");
-  });
 
   updateButtonStates();
 
