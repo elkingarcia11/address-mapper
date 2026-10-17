@@ -1022,90 +1022,155 @@ textarea::placeholder {
   gap: var(--space-sm);
 }
 
+#tab-results.tab-panel.active {
+  overflow: hidden;
+}
+
+#tab-results.tab-panel.active:has(.results-map-section--custom-height) {
+  overflow-y: auto;
+}
+
 .panel-card--results {
-  gap: var(--space-md);
+  gap: var(--space-sm);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#tab-results.tab-panel.active:has(.results-map-section--custom-height) .panel-card--results {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
+.results-summary {
+  flex: 0 0 auto;
+}
+
+.results-summary:has(.results-distance.hidden) {
+  display: none;
 }
 
 .results-map-section {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: var(--space-sm);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.results-map-section--custom-height {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .results-map-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-md);
+  flex-shrink: 0;
+}
+
+.results-map-header > .section-label {
+  margin-right: auto;
+}
+
+.results-map-header .panel-hint {
+  flex: 1 0 100%;
 }
 
 .results-map-header-actions {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.results-map-header-actions .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .results-map-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
   gap: var(--space-md);
   align-items: stretch;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
   min-width: 0;
-  --optimize-map-height: min(68vh, 680px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.results-map-section--custom-height .results-map-layout {
+  grid-template-rows: auto;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .results-map-column {
-  flex: 1 1 58%;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  overflow: hidden;
 }
 
 .results-list-column {
-  flex: 0 0 340px;
-  max-width: 42%;
-  min-width: 260px;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
-  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
 }
 
 .results-map-shell {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #optimizeResultsMap {
   width: 100%;
-  height: var(--optimize-map-height, min(68vh, 680px));
-  min-height: 360px;
+  max-width: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   border: 1px solid var(--border);
   border-bottom: none;
   background: var(--surface-muted);
+  overflow: hidden;
 }
 
-.results-map-section--expanded .results-map-layout {
-  --optimize-map-height: min(78vh, 820px);
-}
-
-.results-map-section--expanded #optimizeResultsMap {
-  height: var(--optimize-map-height, min(78vh, 820px));
+.results-map-section--custom-height #optimizeResultsMap {
+  flex: 0 0 auto;
+  height: var(--optimize-map-height, 420px);
+  min-height: 220px;
 }
 
 .results-route-list {
-  flex: 1;
-  min-height: 360px;
-  max-height: var(--optimize-map-height, min(68vh, 680px));
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-sm);
   background: var(--surface-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+}
+
+.results-map-section--custom-height .results-route-list {
+  max-height: var(--optimize-map-height, 420px);
 }
 
 .results-route-list:focus {
@@ -1465,17 +1530,45 @@ body.is-resizing-optimize-map {
     align-self: flex-start;
   }
 
+  #tab-results.tab-panel.active {
+    overflow-y: auto;
+  }
+
+  .panel-card--results {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .results-map-section,
+  .results-map-layout,
+  .results-map-column,
+  .results-list-column,
+  .results-map-shell {
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
   .results-map-layout {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 
   .results-list-column {
-    flex: 1 1 auto;
-    max-width: none;
     min-width: 0;
   }
 
-  .results-route-list {
+  #optimizeResultsMap,
+  .results-map-section--custom-height #optimizeResultsMap {
+    flex: 0 0 auto;
+    height: min(68vh, 560px);
+    min-height: 240px;
+  }
+
+  .results-route-list,
+  .results-map-section--custom-height .results-route-list {
+    flex: 0 0 auto;
     max-height: min(50vh, 420px);
   }
 

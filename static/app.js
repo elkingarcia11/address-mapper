@@ -340,7 +340,14 @@ function collectPersistedSettings() {
     optimizeEndInput: document.getElementById("optimizeEndInput").value,
     optimizeEndSameAsStart: document.getElementById("optimizeEndSameAsStart").checked,
     truckRouteMode: getTruckRouteMode(),
-    optimizeResultsMapHeight: getOptimizeResultsMapHeight(),
+    optimizeResultsMapHeight: mapSection?.classList.contains(
+      "results-map-section--custom-height"
+    )
+      ? getOptimizeResultsMapHeight()
+      : null,
+    optimizeResultsMapCustomHeight: Boolean(
+      mapSection?.classList.contains("results-map-section--custom-height")
+    ),
     optimizeResultsMapExpanded: Boolean(
       mapSection?.classList.contains("results-map-section--expanded")
     ),
@@ -394,6 +401,7 @@ function loadPersistedSettings() {
   }
   applyOptimizeResultsMapLayout({
     height: data.optimizeResultsMapHeight,
+    customHeight: data.optimizeResultsMapCustomHeight === true,
     expanded: data.optimizeResultsMapExpanded,
   });
 }
@@ -629,7 +637,6 @@ function clearOptimizeResultsMap() {
 }
 
 const OPTIMIZE_MAP_MIN_HEIGHT = 360;
-const OPTIMIZE_MAP_DEFAULT_EXPANDED_VH = 0.78;
 
 function getOptimizeResultsMapLayout() {
   return document.querySelector(".results-map-layout");
@@ -657,6 +664,15 @@ function getOptimizeMapMaxHeight() {
   return Math.max(OPTIMIZE_MAP_MIN_HEIGHT, Math.floor(window.innerHeight * 0.9));
 }
 
+function clearOptimizeMapCustomHeight() {
+  const mapElement = document.getElementById("optimizeResultsMap");
+  const mapSection = document.getElementById("optimizeResultsMapSection");
+  const layout = getOptimizeResultsMapLayout();
+  layout?.style.removeProperty("--optimize-map-height");
+  mapElement?.style.removeProperty("--optimize-map-height");
+  mapSection?.classList.remove("results-map-section--custom-height");
+}
+
 function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = true } = {}) {
   const mapElement = document.getElementById("optimizeResultsMap");
   const mapSection = document.getElementById("optimizeResultsMapSection");
@@ -674,6 +690,7 @@ function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = tr
     layout.style.setProperty("--optimize-map-height", heightValue);
   }
   mapElement.style.setProperty("--optimize-map-height", heightValue);
+  mapSection.classList.add("results-map-section--custom-height");
   mapSection.classList.toggle(
     "results-map-section--expanded",
     clamped >= Math.floor(window.innerHeight * 0.7)
@@ -688,31 +705,26 @@ function setOptimizeResultsMapHeight(heightPx, { persist = true, refreshMap = tr
   }
 }
 
-function applyOptimizeResultsMapLayout({ height, expanded } = {}) {
+function applyOptimizeResultsMapLayout({ height, expanded, customHeight = false } = {}) {
   const mapSection = document.getElementById("optimizeResultsMapSection");
   const mapElement = document.getElementById("optimizeResultsMap");
-  const layout = getOptimizeResultsMapLayout();
   if (!mapSection || !mapElement) {
     return;
   }
 
-  if (typeof height === "number" && Number.isFinite(height) && height > 0) {
-    const heightValue = `${Math.round(height)}px`;
-    if (layout) {
-      layout.style.setProperty("--optimize-map-height", heightValue);
-    }
-    mapElement.style.setProperty("--optimize-map-height", heightValue);
+  clearOptimizeMapCustomHeight();
+
+  if (
+    customHeight &&
+    typeof height === "number" &&
+    Number.isFinite(height) &&
+    height > 0
+  ) {
+    setOptimizeResultsMapHeight(height, { persist: false, refreshMap: false });
   }
 
-  if (typeof expanded === "boolean") {
+  if (typeof expanded === "boolean" && !customHeight) {
     mapSection.classList.toggle("results-map-section--expanded", expanded);
-    if (expanded && !(layout || mapElement).style.getPropertyValue("--optimize-map-height")) {
-      const defaultHeight = `${Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)}px`;
-      if (layout) {
-        layout.style.setProperty("--optimize-map-height", defaultHeight);
-      }
-      mapElement.style.setProperty("--optimize-map-height", defaultHeight);
-    }
   }
 
   updateExpandOptimizeMapButton();
@@ -736,23 +748,16 @@ function toggleOptimizeMapExpanded() {
   }
 
   const expanding = !mapSection.classList.contains("results-map-section--expanded");
-  if (expanding) {
-    setOptimizeResultsMapHeight(
-      Math.floor(window.innerHeight * OPTIMIZE_MAP_DEFAULT_EXPANDED_VH)
-    );
-  } else {
-    const layout = getOptimizeResultsMapLayout();
-    if (layout) {
-      layout.style.removeProperty("--optimize-map-height");
+  clearOptimizeMapCustomHeight();
+  mapSection.classList.toggle("results-map-section--expanded", expanding);
+  updateExpandOptimizeMapButton();
+  if (optimizeResultsMap && typeof google !== "undefined") {
+    google.maps.event.trigger(optimizeResultsMap, "resize");
+    if (expanding && optimizeRouteOverlays.length > 0) {
+      fitOptimizeResultsMapBounds();
     }
-    mapElement.style.removeProperty("--optimize-map-height");
-    mapSection.classList.remove("results-map-section--expanded");
-    updateExpandOptimizeMapButton();
-    if (optimizeResultsMap && typeof google !== "undefined") {
-      google.maps.event.trigger(optimizeResultsMap, "resize");
-    }
-    savePersistedSettings();
   }
+  savePersistedSettings();
 }
 
 function initOptimizeResultsMapResize() {
